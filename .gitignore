@@ -1,0 +1,31 @@
+# Personal configuration - never commit
+config.yaml
+
+# Your documents and indexes - never commit
+workspaces/
+
+# Databases
+*.db
+
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+
+# Environment secrets
+.env
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Pytest
+.pytest_cache/
+htmlcov/
+.coverage

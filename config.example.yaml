@@ -1,0 +1,45 @@
+# =============================================================================
+# Local AI Document Assistant - Configuration Template
+# =============================================================================
+# INSTRUCTIONS:
+#   1. Copy this file to config.yaml
+#   2. Edit config.yaml with YOUR paths and settings
+#   3. Never commit config.yaml - it is gitignored
+# =============================================================================
+
+paths:
+  workspaces_root: "/home/YOUR_USERNAME/ai_workspaces"  # Windows: "E:/AI_Projects/workspaces"
+  documents_root: "/mnt/external/documents"              # Windows: "E:/Documents"
+  models_root: "/mnt/external/ollama_models"             # Windows: "E:/OLLAMA_MODELS"
+  tesseract_path: "/usr/bin/tesseract"                   # Windows: "C:/Program Files/Tesseract-OCR/tesseract.exe"
+  temp_dir: "/tmp/doc_assistant"                         # Windows: "C:/Temp/doc_assistant"
+
+ollama:
+  base_url: "http://localhost:11434"
+  timeout_seconds: 120
+
+models:
+  llm: "gemma4:31b"          # 12GB VRAM - best quality
+  # llm: "gemma4:e4b"        # 8GB VRAM - good balance
+  # llm: "gemma4:e2b"        # 6GB VRAM or CPU only
+  router_llm: "gemma4:e4b"
+  embeddings: "nomic-embed-text"
+
+hardware:
+  use_gpu: true
+  vram_gb: 12
+  max_context_tokens: 8000
+
+retrieval:
+  top_k: 10
+  top_k_final: 5
+  chunk_size: 1000
+  chunk_overlap: 200
+  hybrid_weight: 0.7          # 0.7 = 70% semantic, 30% keyword
+
+interface:
+  webui_port: 3000
+  api_port: 8000
+
+ocr:
+  language: "eng"
