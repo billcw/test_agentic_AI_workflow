@@ -106,18 +106,15 @@ def ingest_file(project_name: str, file_path: str | Path,
         # Step 6: Add to vector store (ChromaDB)
         added = add_chunks(project_name, chunks)
 
-        # Step 7: Update BM25 index.
-        # Load existing chunks from other documents, merge with new chunks
-        # using chunk_id as the key. This means re-ingesting the same file
-        # is safe — its old chunks are replaced, not duplicated.
+        # Step 7: Update BM25 index
+        # Load existing chunks, merge with new ones, deduplicate by chunk_id.
+        # This prevents duplicate entries if a file is re-ingested.
         _, existing_chunks = load_index(project_name)
-        existing_chunks = existing_chunks or []
-
-        # Build a dict keyed by chunk_id so new chunks overwrite old ones
-        merged = {c["chunk_id"]: c for c in existing_chunks}
-        for c in chunks:
-            merged[c["chunk_id"]] = c
-        save_index(project_name, list(merged.values()))
+        existing_by_id = {c["chunk_id"]: c for c in (existing_chunks or [])}
+        for chunk in chunks:
+            existing_by_id[chunk["chunk_id"]] = chunk
+        all_chunks = list(existing_by_id.values())
+        save_index(project_name, all_chunks)
 
         # Step 8: Record in metadata DB
         doc_id = record_document(
