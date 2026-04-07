@@ -244,11 +244,11 @@ local-ai-doc-assistant/
 |-------|------|--------|
 | Phase 0 | Ollama + Gemma 4 + Open WebUI running | ✅ Complete |
 | Phase 1 | Portable project skeleton + Git repo | ✅ Complete |
-| Phase 2 | Document ingestion pipeline — all file types | 🔄 In Progress |
-| Phase 3 | Hybrid retrieval — semantic + keyword + re-ranker | ⏳ Pending |
-| Phase 4 | Agentic layer — four LangGraph agents | ⏳ Pending |
-| Phase 5 | Team interface — FastAPI + Open WebUI integration | ⏳ Pending |
-| Phase 6 | GitHub release — tests, docs, README complete | ⏳ Pending |
+| Phase 2 | Document ingestion pipeline — all file types | ✅ Complete |
+| Phase 3 | Hybrid retrieval — semantic + keyword + re-ranker | ✅ Complete |
+| Phase 4 | Agentic layer — four LangGraph agents | ✅ Complete |
+| Phase 5 | Team interface — FastAPI + custom web UI | ✅ Complete |
+| Phase 6 | GitHub release — tests, docs, README complete | ✅ Complete |
 
 ---
 
