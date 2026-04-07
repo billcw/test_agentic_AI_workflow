@@ -1,31 +1,22 @@
 """
 api/server.py - FastAPI backend for the Local AI Document Assistant.
 
-This is the HTTP interface that sits between the browser/UI and the
-agentic layer. It exposes clean REST endpoints so that Open WebUI
-(or any HTTP client) can:
-  - Send a query and get an agent response
-  - Upload and ingest a document
-  - List and create projects
-  - Retrieve chat history
-
-Analogy: Think of this as the front desk of an office. Requests come
-in through the door (HTTP), get routed to the right department
-(agents, ingestion, projects), and responses go back out.
-
 To run the server:
   uvicorn src.api.server:app --host 0.0.0.0 --port 8000 --reload
 """
 
 import uuid
+import requests as http_requests
 from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
-from src.config import INTERFACE, PATHS
+from src.config import INTERFACE, PATHS, OLLAMA
 from src.agents.orchestrator import run_agent
 from src.ingestion.pipeline import ingest_file
 from src.memory.history import (
@@ -46,25 +37,25 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Allow Open WebUI (running on a different port) to call this API.
-# CORS = Cross-Origin Resource Sharing. Without this, browsers block
-# requests from one port to another as a security measure.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],   # Tighten this in production
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# Serve static files (the web UI) from src/api/static/
+static_dir = Path(__file__).parent / "static"
+static_dir.mkdir(exist_ok=True)
+app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+
 
 # --- Request / Response Models ---
-# Pydantic models define the shape of JSON request bodies.
-# FastAPI validates incoming requests against these automatically.
 
 class QueryRequest(BaseModel):
     project_name: str
     query: str
-    session_id: Optional[str] = None   # If None, a new session is started
+    session_id: Optional[str] = None
 
 
 class QueryResponse(BaseModel):
@@ -79,12 +70,45 @@ class CreateProjectRequest(BaseModel):
     project_name: str
 
 
+# --- Serve Web UI ---
+
+@app.get("/")
+def serve_ui():
+    """Serve the main web UI."""
+    index_path = static_dir / "index.html"
+    if not index_path.exists():
+        raise HTTPException(status_code=404,
+                            detail="UI not found. index.html missing.")
+    return FileResponse(str(index_path))
+
+
 # --- Health Check ---
 
 @app.get("/health")
 def health_check():
-    """Simple liveness check. Returns OK if the server is running."""
+    """Simple liveness check."""
     return {"status": "ok", "service": "local-ai-doc-assistant"}
+
+
+# --- Models Endpoint ---
+
+@app.get("/models")
+def get_models():
+    """
+    Return the list of models currently available in Ollama.
+    The UI uses this to populate the model selection dropdowns.
+    """
+    try:
+        response = http_requests.get(
+            f"{OLLAMA['base_url']}/api/tags",
+            timeout=10
+        )
+        response.raise_for_status()
+        models = response.json().get("models", [])
+        model_names = sorted([m["name"] for m in models])
+        return {"models": model_names}
+    except Exception as e:
+        return {"models": [], "error": str(e)}
 
 
 # --- Query Endpoint ---
@@ -94,34 +118,25 @@ def query(request: QueryRequest):
     """
     Main query endpoint. Routes the user's message through the full
     agentic pipeline and returns the answer with citations.
-
-    If session_id is provided, chat history is loaded and passed to
-    the agent so it has conversation context. If not provided, a new
-    session ID is generated.
     """
     if not project_exists(request.project_name):
         raise HTTPException(
             status_code=404,
-            detail=f"Project '{request.project_name}' not found. "
-                   f"Create it first via POST /projects."
+            detail=f"Project '{request.project_name}' not found."
         )
 
-    # Use provided session_id or generate a new one
     session_id = request.session_id or str(uuid.uuid4())
 
-    # Load recent chat history for context
     chat_history = get_recent_history(
         request.project_name, session_id, max_turns=6
     )
 
-    # Run the full agentic pipeline
     result = run_agent(
         project_name=request.project_name,
         query=request.query,
         chat_history=chat_history
     )
 
-    # Persist this turn to history
     save_turn(
         project_name=request.project_name,
         session_id=session_id,
@@ -147,20 +162,13 @@ async def ingest_document(
     project_name: str = Form(...),
     file: UploadFile = File(...)
 ):
-    """
-    Upload and ingest a document into a project workspace.
-
-    Accepts any supported file type (PDF, DOCX, TXT, etc.).
-    Saves the file to a temp location, runs the ingestion pipeline,
-    then returns the result.
-    """
+    """Upload and ingest a document into a project workspace."""
     if not project_exists(project_name):
         raise HTTPException(
             status_code=404,
             detail=f"Project '{project_name}' not found."
         )
 
-    # Save uploaded file to temp directory
     temp_dir = Path(PATHS.get("temp_dir", "/tmp/doc_assistant"))
     temp_dir.mkdir(parents=True, exist_ok=True)
     temp_path = temp_dir / file.filename
@@ -168,10 +176,7 @@ async def ingest_document(
     try:
         contents = await file.read()
         temp_path.write_bytes(contents)
-
-        # Run ingestion pipeline
         result = ingest_file(project_name, str(temp_path))
-
         return {
             "status": result["status"],
             "filename": file.filename,
@@ -179,7 +184,6 @@ async def ingest_document(
             "message": result.get("message", "")
         }
     finally:
-        # Clean up temp file
         if temp_path.exists():
             temp_path.unlink()
 
