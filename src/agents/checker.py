@@ -100,8 +100,8 @@ a structured verification with citations."""
                 "stream": False,
                 "options": {
                     "temperature": 0.1,
-                    "num_predict": 1024,
-                    "num_ctx": 4096,
+                    "num_predict": 2048,
+                    "num_ctx": 8192,
                 }
             },
             timeout=OLLAMA["timeout_seconds"]
