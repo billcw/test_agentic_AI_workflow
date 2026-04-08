@@ -14,8 +14,15 @@ Why /api/generate instead of /api/chat:
 Gemma 4 models use /api/chat to trigger extended thinking mode, which
 consumes all available tokens on internal reasoning and returns empty
 content. /api/generate bypasses this and returns actual answers.
+
+Chain of Thought + Confidence:
+The system prompt instructs the model to reason step-by-step before
+answering, and to append a CONFIDENCE line at the end. We parse that
+line out and return it as a separate integer field (1-5) so the UI
+can display a warning badge when confidence is low.
 """
 
+import re
 import requests
 from src.config import OLLAMA, MODELS, RETRIEVAL
 from src.retrieval.hybrid_search import hybrid_search
@@ -27,13 +34,19 @@ Your job is to teach procedures clearly and accurately based ONLY on the
 provided document excerpts.
 
 Rules you must always follow:
-1. Base your answer ONLY on the provided document excerpts. Do not invent steps.
-2. Cite your source for each major step or claim, like this: [Source: filename.pdf, p.2]
-3. If the documents don't contain enough information to answer fully, say so explicitly.
-4. Structure your response as numbered steps when explaining a procedure.
-5. If you see conflicting information between documents, flag it explicitly:
+1. Before giving your final answer, briefly think through what the documents
+   say about this topic and what the key points are. Show this reasoning.
+2. Base your answer ONLY on the provided document excerpts. Do not invent steps.
+3. Cite your source for each major step or claim, like this: [Source: filename.pdf, p.2]
+4. If the documents don't contain enough information to answer fully, say so explicitly.
+5. Structure your response as numbered steps when explaining a procedure.
+6. If you see conflicting information between documents, flag it explicitly:
    WARNING: Document A says X but Document B says Y. Verify before proceeding.
-6. End with a summary of which documents were used."""
+7. End with a summary of which documents were used.
+8. On the very last line of your response, write your confidence rating in
+   this exact format (nothing else on that line):
+   CONFIDENCE: X/5 — brief reason
+   Where X is 1 (very uncertain) to 5 (fully supported by documents)."""
 
 
 def build_context(chunks: list[dict]) -> str:
@@ -54,6 +67,32 @@ def build_context(chunks: list[dict]) -> str:
     return "\n\n---\n\n".join(parts)
 
 
+def parse_confidence(answer: str) -> tuple[str, int]:
+    """
+    Extract the CONFIDENCE line from the end of the model's response.
+
+    Returns:
+        (cleaned_answer, confidence_score)
+        cleaned_answer: the answer with the CONFIDENCE line removed
+        confidence_score: integer 1-5, defaults to 3 if not parseable
+
+    Why we strip it from the answer:
+        Confidence is metadata for the UI, not part of the explanation
+        the operator reads. Keeping them separate makes both cleaner.
+    """
+    # Match "CONFIDENCE: X/5 — anything" at end of response
+    pattern = r'\nCONFIDENCE:\s*([1-5])/5[^\n]*$'
+    match = re.search(pattern, answer.strip(), re.IGNORECASE)
+
+    if match:
+        score = int(match.group(1))
+        cleaned = answer[:match.start()].strip()
+        return cleaned, score
+
+    # If the model didn't follow the format, default to 3 (neutral)
+    return answer.strip(), 3
+
+
 def teach(project_name: str, query: str,
           chat_history: list[dict] = None) -> dict:
     """
@@ -70,6 +109,7 @@ def teach(project_name: str, query: str,
             "answer": "Step-by-step explanation...",
             "sources": ["file1.pdf", "file2.txt"],
             "chunks_used": 3,
+            "confidence": 4,
             "intent": "teach"
         }
     """
@@ -85,6 +125,7 @@ def teach(project_name: str, query: str,
                        "Please ensure the relevant documents have been ingested."),
             "sources": [],
             "chunks_used": 0,
+            "confidence": 1,
             "intent": "teach"
         }
 
@@ -92,8 +133,6 @@ def teach(project_name: str, query: str,
     context = build_context(chunks)
 
     # Step 3: Build a single prompt string
-    # /api/generate takes a prompt string, not a messages list.
-    # We bake the system prompt, chat history, context, and query together.
     history_text = ""
     if chat_history:
         for msg in chat_history:
@@ -109,7 +148,8 @@ def teach(project_name: str, query: str,
 
 Question: {query}
 
-Provide a clear, step-by-step explanation with citations."""
+Think through what the documents say, then provide a clear, step-by-step
+explanation with citations. End with your CONFIDENCE rating."""
 
     # Step 4: Call Gemma 4 31B via /api/generate
     try:
@@ -128,17 +168,27 @@ Provide a clear, step-by-step explanation with citations."""
             timeout=OLLAMA["timeout_seconds"]
         )
         response.raise_for_status()
-        answer = response.json()["response"].strip()
+        raw_answer = response.json()["response"].strip()
 
     except Exception as e:
-        answer = f"Error contacting language model: {str(e)}"
+        return {
+            "answer": f"Error contacting language model: {str(e)}",
+            "sources": [],
+            "chunks_used": len(chunks),
+            "confidence": 1,
+            "intent": "teach"
+        }
 
-    # Step 5: Collect unique source filenames
+    # Step 5: Parse confidence score out of the answer
+    answer, confidence = parse_confidence(raw_answer)
+
+    # Step 6: Collect unique source filenames
     sources = list({chunk.get("source", "unknown") for chunk in chunks})
 
     return {
         "answer": answer,
         "sources": sources,
         "chunks_used": len(chunks),
+        "confidence": confidence,
         "intent": "teach"
     }

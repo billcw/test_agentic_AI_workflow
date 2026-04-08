@@ -7,13 +7,17 @@ were missed, done out of order, or done incorrectly.
 
 This is the safety net agent -- it is deliberately conservative and
 always flags its own uncertainty rather than silently approving work.
+
+Chain of Thought + Confidence:
+Same pattern as teacher.py -- model reasons before answering and
+appends a CONFIDENCE line that we parse out for the UI.
 """
 
 import requests
 from src.config import OLLAMA, MODELS, RETRIEVAL
 from src.retrieval.hybrid_search import hybrid_search
 from src.retrieval.reranker import rerank
-from src.agents.teacher import build_context
+from src.agents.teacher import build_context, parse_confidence
 
 
 CHECKER_SYSTEM_PROMPT = """You are a SCADA/EMS work verification assistant.
@@ -21,18 +25,25 @@ Your job is to compare what an operator did against the official procedure
 from the provided document excerpts.
 
 Rules you must always follow:
-1. Base your verification ONLY on the provided document excerpts.
-2. Cite the official procedure source for every comparison: [Source: filename, p.X]
-3. Structure your response as:
+1. Before giving your verdict, briefly think through what the official
+   procedure requires and how it compares to what the operator reported.
+   Show this reasoning before your structured answer.
+2. Base your verification ONLY on the provided document excerpts.
+3. Cite the official procedure source for every comparison: [Source: filename, p.X]
+4. Structure your response as:
    - STEPS COMPLETED CORRECTLY: What was done right
    - STEPS MISSED: Required steps not mentioned by the operator
    - STEPS OUT OF ORDER: Correct actions done in wrong sequence
    - POTENTIAL RISKS: Safety concerns based on what was reported
    - OVERALL VERDICT: APPROVED / NEEDS REVIEW / UNSAFE
-4. If you cannot find the official procedure in the documents, say so explicitly.
-5. If you are uncertain about any comparison, flag it:
+5. If you cannot find the official procedure in the documents, say so explicitly.
+6. If you are uncertain about any comparison, flag it:
    UNCERTAIN: I cannot confirm this step from the available documents.
-6. Never approve work you cannot verify against a document."""
+7. Never approve work you cannot verify against a document.
+8. On the very last line of your response, write your confidence rating in
+   this exact format (nothing else on that line):
+   CONFIDENCE: X/5 — brief reason
+   Where X is 1 (very uncertain) to 5 (fully supported by documents)."""
 
 
 def check(project_name: str, query: str,
@@ -50,6 +61,7 @@ def check(project_name: str, query: str,
             "answer": "Verification result with citations...",
             "sources": ["procedure.pdf"],
             "chunks_used": 3,
+            "confidence": 4,
             "intent": "check"
         }
     """
@@ -65,6 +77,7 @@ def check(project_name: str, query: str,
                        "without a source document to compare against."),
             "sources": [],
             "chunks_used": 0,
+            "confidence": 1,
             "intent": "check"
         }
 
@@ -87,8 +100,9 @@ def check(project_name: str, query: str,
 
 Operator's reported actions: {query}
 
-Compare the operator's actions against the official procedure and provide
-a structured verification with citations."""
+Think through how the operator's actions compare to the official procedure,
+then provide a structured verification with citations. End with your
+CONFIDENCE rating."""
 
     # Step 4: Call the LLM via /api/generate
     try:
@@ -107,17 +121,27 @@ a structured verification with citations."""
             timeout=OLLAMA["timeout_seconds"]
         )
         response.raise_for_status()
-        answer = response.json()["response"].strip()
+        raw_answer = response.json()["response"].strip()
 
     except Exception as e:
-        answer = f"Error contacting language model: {str(e)}"
+        return {
+            "answer": f"Error contacting language model: {str(e)}",
+            "sources": [],
+            "chunks_used": len(chunks),
+            "confidence": 1,
+            "intent": "check"
+        }
 
-    # Step 5: Collect unique sources
+    # Step 5: Parse confidence score out of the answer
+    answer, confidence = parse_confidence(raw_answer)
+
+    # Step 6: Collect unique sources
     sources = list({chunk.get("source", "unknown") for chunk in chunks})
 
     return {
         "answer": answer,
         "sources": sources,
         "chunks_used": len(chunks),
+        "confidence": confidence,
         "intent": "check"
     }

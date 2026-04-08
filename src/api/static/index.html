@@ -168,10 +168,28 @@
     letter-spacing: 0.04em;
   }
 
-  .intent-teach    { background: #1a3a5c; color: #7eb8f7; }
+  .intent-teach        { background: #1a3a5c; color: #7eb8f7; }
   .intent-troubleshoot { background: #3a1a1a; color: #f77e7e; }
-  .intent-check    { background: #1a3a2a; color: #7ef7b0; }
-  .intent-lookup   { background: #2a2a1a; color: #f7e07e; }
+  .intent-check        { background: #1a3a2a; color: #7ef7b0; }
+  .intent-lookup       { background: #2a2a1a; color: #f7e07e; }
+
+  /* Confidence badge — normal (3-5) and low-confidence warning (1-2) */
+  .confidence-badge {
+    font-size: 10px;
+    padding: 1px 7px;
+    border-radius: 10px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+  }
+
+  .confidence-ok  { background: #1a2a1a; color: #7ef7b0; }
+  .confidence-low { background: #3a2a00; color: #f7c07e; }
+  .confidence-warn-text {
+    font-size: 11px;
+    color: #f7c07e;
+    margin-top: 6px;
+    display: block;
+  }
 
   .sources {
     margin-top: 8px;
@@ -283,9 +301,7 @@
   }
 
   #modal input:focus { border-color: #4f7ef7; }
-
   .modal-buttons { display: flex; gap: 8px; justify-content: flex-end; }
-
   #modal-status { font-size: 12px; color: #f77e7e; min-height: 16px; margin-bottom: 8px; }
 
   /* Scrollbar */
@@ -299,23 +315,19 @@
 <!-- Top Bar -->
 <div id="topbar">
   <h1>📄 Doc Assistant</h1>
-
   <div class="bar-group">
     <span class="bar-label">Project</span>
     <select id="project-select"><option>Loading...</option></select>
     <button id="btn-new-project">+ New</button>
   </div>
-
   <div class="bar-group">
     <span class="bar-label">Router model</span>
     <select id="router-model-select"><option>Loading...</option></select>
   </div>
-
   <div class="bar-group">
     <span class="bar-label">Reasoning model</span>
     <select id="reasoning-model-select"><option>Loading...</option></select>
   </div>
-
   <div class="bar-group">
     <label id="upload-label">⬆ Upload Doc
       <input type="file" id="upload-input">
@@ -348,10 +360,9 @@
 
 <script>
 // --- State ---
-let sessionIds = {};   // project_name -> session_id (persisted in localStorage)
 let currentProject = null;
+let sessionIds = {};
 
-// --- Persistence helpers ---
 function loadPref(key, fallback) {
   try { return localStorage.getItem(key) || fallback; } catch { return fallback; }
 }
@@ -390,14 +401,12 @@ async function loadModels() {
       `<option value="${m}">${m}</option>`
     ).join('');
 
-    // Restore saved selections
     const savedRouter = loadPref('router_model', 'gemma4:e4b');
     const savedReason = loadPref('reasoning_model', 'gemma4:31b');
 
     setSelectValue(routerSel, savedRouter);
     setSelectValue(reasonSel, savedReason);
 
-    // Save on change
     routerSel.addEventListener('change', () => savePref('router_model', routerSel.value));
     reasonSel.addEventListener('change', () => savePref('reasoning_model', reasonSel.value));
 
@@ -410,7 +419,6 @@ function setSelectValue(sel, value) {
   for (let opt of sel.options) {
     if (opt.value === value) { sel.value = value; return; }
   }
-  // Value not found — leave at first option
 }
 
 // --- Load projects into dropdown ---
@@ -431,7 +439,6 @@ async function loadProjects() {
       `<option value="${p.name}" ${p.ready ? '' : 'style="color:#6b7280"'}>${p.name}${p.ready ? '' : ' (empty)'}</option>`
     ).join('');
 
-    // Restore saved project selection
     const saved = loadPref('selected_project', projects[0].name);
     setSelectValue(sel, saved);
     currentProject = sel.value;
@@ -452,7 +459,7 @@ function clearChat() {
   document.getElementById('chat-area').innerHTML = '';
 }
 
-function appendMessage(role, text, intent, sources) {
+function appendMessage(role, text, intent, sources, confidence) {
   const area = document.getElementById('chat-area');
   const div = document.createElement('div');
   div.className = `message ${role}`;
@@ -472,9 +479,26 @@ function appendMessage(role, text, intent, sources) {
     meta.appendChild(badge);
   }
 
+  // Confidence badge — only shown on assistant messages with a score
+  if (confidence !== undefined && confidence !== null) {
+    const isLow = confidence <= 2;
+    const badge = document.createElement('span');
+    badge.className = `confidence-badge ${isLow ? 'confidence-low' : 'confidence-ok'}`;
+    badge.textContent = `confidence ${confidence}/5`;
+    meta.appendChild(badge);
+  }
+
   const bubble = document.createElement('div');
   bubble.className = 'bubble';
   bubble.innerHTML = formatText(text);
+
+  // Low confidence warning below the answer text
+  if (confidence !== undefined && confidence !== null && confidence <= 2) {
+    const warn = document.createElement('span');
+    warn.className = 'confidence-warn-text';
+    warn.textContent = '⚠ Low confidence — verify this answer against the source documents before acting.';
+    bubble.appendChild(warn);
+  }
 
   if (sources && sources.length > 0) {
     const srcDiv = document.createElement('div');
@@ -491,7 +515,6 @@ function appendMessage(role, text, intent, sources) {
 }
 
 function formatText(text) {
-  // Basic markdown-like formatting
   return text
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
@@ -509,10 +532,9 @@ async function sendQuery() {
   input.style.height = 'auto';
   document.getElementById('btn-send').disabled = true;
 
-  appendMessage('user', query, null, null);
+  appendMessage('user', query, null, null, null);
 
-  // Show thinking indicator
-  const thinkingDiv = appendMessage('assistant', 'Thinking...', null, null);
+  const thinkingDiv = appendMessage('assistant', 'Thinking...', null, null, null);
   thinkingDiv.classList.add('thinking');
 
   try {
@@ -530,17 +552,15 @@ async function sendQuery() {
 
     const data = await res.json();
 
-    // Save session ID for this project
     sessionIds[currentProject] = data.session_id;
     saveSessionIds();
 
-    // Replace thinking with real answer
     thinkingDiv.remove();
-    appendMessage('assistant', data.answer, data.intent, data.sources);
+    appendMessage('assistant', data.answer, data.intent, data.sources, data.confidence);
 
   } catch(e) {
     thinkingDiv.remove();
-    appendMessage('assistant', `Error: ${e.message}`, null, null);
+    appendMessage('assistant', `Error: ${e.message}`, null, null, null);
   }
 
   document.getElementById('btn-send').disabled = false;
@@ -610,7 +630,6 @@ document.getElementById('modal-confirm').addEventListener('click', async () => {
     if (res.ok) {
       document.getElementById('modal-overlay').classList.remove('visible');
       await loadProjects();
-      // Select the new project
       const sel = document.getElementById('project-select');
       setSelectValue(sel, data.name);
       currentProject = data.name;
@@ -626,7 +645,6 @@ document.getElementById('modal-confirm').addEventListener('click', async () => {
   }
 });
 
-// Enter in modal confirms
 document.getElementById('modal-input').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') document.getElementById('modal-confirm').click();
   if (e.key === 'Escape') document.getElementById('modal-cancel').click();

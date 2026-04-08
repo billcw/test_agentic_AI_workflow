@@ -32,6 +32,7 @@ class AgentState(TypedDict):
     answer: str                # Filled in by the specialist node
     sources: list              # Documents used
     chunks_used: int           # How many chunks were retrieved
+    confidence: int            # 1-5 score parsed from model response
     chat_history: list         # Prior conversation turns
 
 
@@ -58,7 +59,8 @@ def teach_node(state: AgentState) -> dict:
     return {
         "answer": result["answer"],
         "sources": result["sources"],
-        "chunks_used": result["chunks_used"]
+        "chunks_used": result["chunks_used"],
+        "confidence": result.get("confidence", 3)
     }
 
 
@@ -73,7 +75,8 @@ def troubleshoot_node(state: AgentState) -> dict:
     return {
         "answer": result["answer"],
         "sources": result["sources"],
-        "chunks_used": result["chunks_used"]
+        "chunks_used": result["chunks_used"],
+        "confidence": result.get("confidence", 3)
     }
 
 
@@ -88,7 +91,8 @@ def check_node(state: AgentState) -> dict:
     return {
         "answer": result["answer"],
         "sources": result["sources"],
-        "chunks_used": result["chunks_used"]
+        "chunks_used": result["chunks_used"],
+        "confidence": result.get("confidence", 3)
     }
 
 
@@ -103,7 +107,8 @@ def lookup_node(state: AgentState) -> dict:
     return {
         "answer": result["answer"],
         "sources": result["sources"],
-        "chunks_used": result["chunks_used"]
+        "chunks_used": result["chunks_used"],
+        "confidence": result.get("confidence", 3)
     }
 
 
@@ -183,7 +188,8 @@ def run_agent(project_name: str, query: str,
             "answer": "...",
             "intent": "teach|troubleshoot|check|lookup",
             "sources": ["file.pdf"],
-            "chunks_used": 3
+            "chunks_used": 3,
+            "confidence": 4
         }
     """
     initial_state = AgentState(
@@ -193,6 +199,7 @@ def run_agent(project_name: str, query: str,
         answer="",
         sources=[],
         chunks_used=0,
+        confidence=3,
         chat_history=chat_history or []
     )
 
@@ -202,5 +209,6 @@ def run_agent(project_name: str, query: str,
         "answer": final_state["answer"],
         "intent": final_state["intent"],
         "sources": final_state["sources"],
-        "chunks_used": final_state["chunks_used"]
+        "chunks_used": final_state["chunks_used"],
+        "confidence": final_state.get("confidence", 3)
     }

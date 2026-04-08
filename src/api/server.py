@@ -63,6 +63,7 @@ class QueryResponse(BaseModel):
     intent: str
     sources: list
     chunks_used: int
+    confidence: int
     session_id: str
 
 
@@ -151,6 +152,7 @@ def query(request: QueryRequest):
         intent=result["intent"],
         sources=result["sources"],
         chunks_used=result["chunks_used"],
+        confidence=result.get("confidence", 3),
         session_id=session_id
     )
 
