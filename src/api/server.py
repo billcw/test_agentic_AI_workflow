@@ -18,7 +18,7 @@ from pydantic import BaseModel
 
 from src.config import INTERFACE, PATHS, OLLAMA
 from src.agents.orchestrator import run_agent
-from src.ingestion.pipeline import ingest_file
+from src.ingestion.pipeline import ingest_file, ingest_directory
 from src.memory.history import (
     save_turn, get_recent_history,
     get_session_history, list_sessions
@@ -69,6 +69,12 @@ class QueryResponse(BaseModel):
 
 class CreateProjectRequest(BaseModel):
     project_name: str
+
+
+class IngestFolderRequest(BaseModel):
+    project_name: str
+    folder_path: str
+    force: bool = False
 
 
 # --- Serve Web UI ---
@@ -157,14 +163,14 @@ def query(request: QueryRequest):
     )
 
 
-# --- Document Ingestion Endpoint ---
+# --- Document Ingestion Endpoints ---
 
 @app.post("/ingest")
 async def ingest_document(
     project_name: str = Form(...),
     file: UploadFile = File(...)
 ):
-    """Upload and ingest a document into a project workspace."""
+    """Upload and ingest a single document into a project workspace."""
     if not project_exists(project_name):
         raise HTTPException(
             status_code=404,
@@ -188,6 +194,58 @@ async def ingest_document(
     finally:
         if temp_path.exists():
             temp_path.unlink()
+
+
+@app.post("/ingest_folder")
+def ingest_folder(request: IngestFolderRequest):
+    """
+    Ingest all supported documents from a folder path on the server.
+
+    This is for bulk ingestion of documents already on the server machine.
+    The folder_path must be an absolute path accessible to the server process.
+
+    Why a server-side path instead of uploading files:
+    When you have hundreds of documents already on disk (e.g. on an external
+    drive), re-uploading them through the browser would be slow and pointless.
+    This endpoint lets the server read them directly from disk.
+
+    Returns a summary of what was ingested, skipped, and errored.
+    """
+    if not project_exists(request.project_name):
+        raise HTTPException(
+            status_code=404,
+            detail=f"Project '{request.project_name}' not found."
+        )
+
+    folder = Path(request.folder_path)
+
+    if not folder.exists():
+        raise HTTPException(
+            status_code=400,
+            detail=f"Folder not found: {request.folder_path}"
+        )
+
+    if not folder.is_dir():
+        raise HTTPException(
+            status_code=400,
+            detail=f"Path is not a directory: {request.folder_path}"
+        )
+
+    result = ingest_directory(
+        project_name=request.project_name,
+        directory=folder,
+        force=request.force
+    )
+
+    return {
+        "status": "complete",
+        "folder": str(folder),
+        "ingested": result["ingested"],
+        "skipped": result["skipped"],
+        "errors": result["errors"],
+        "total": result["total"],
+        "results": result["results"]
+    }
 
 
 # --- Project Management Endpoints ---

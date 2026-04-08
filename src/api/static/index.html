@@ -106,6 +106,67 @@
     min-width: 120px;
   }
 
+  /* --- Folder ingest bar --- */
+  #folder-bar {
+    background: #13181f;
+    border-bottom: 1px solid #2a2f3e;
+    padding: 7px 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  #folder-bar span.bar-label {
+    font-size: 11px;
+    color: #6b7280;
+    white-space: nowrap;
+  }
+
+  #folder-path-input {
+    flex: 1;
+    min-width: 220px;
+    max-width: 480px;
+    background: #1e2433;
+    color: #ececec;
+    border: 1px solid #2a2f3e;
+    border-radius: 6px;
+    padding: 5px 10px;
+    font-size: 12px;
+    font-family: 'Courier New', monospace;
+    outline: none;
+  }
+
+  #folder-path-input:focus { border-color: #4f7ef7; }
+  #folder-path-input::placeholder { color: #4f5a6b; }
+
+  #btn-ingest-folder {
+    background: #2a1a3a;
+    border-color: #5a2d8e;
+    color: #c07ef7;
+  }
+
+  #btn-ingest-folder:hover { background: #341a50; }
+  #btn-ingest-folder:disabled { background: #1e2433; color: #4f5a6b; cursor: not-allowed; }
+
+  .force-label {
+    font-size: 11px;
+    color: #6b7280;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .force-label input[type="checkbox"] { cursor: pointer; }
+
+  #folder-status {
+    font-size: 11px;
+    color: #6b7280;
+    min-width: 160px;
+  }
+
   /* --- Chat Area --- */
   #chat-area {
     flex: 1;
@@ -173,7 +234,7 @@
   .intent-check        { background: #1a3a2a; color: #7ef7b0; }
   .intent-lookup       { background: #2a2a1a; color: #f7e07e; }
 
-  /* Confidence badge — normal (3-5) and low-confidence warning (1-2) */
+  /* Confidence badge */
   .confidence-badge {
     font-size: 10px;
     padding: 1px 7px;
@@ -216,6 +277,11 @@
     font-family: 'Courier New', monospace;
     font-size: 12px;
     color: #7ef7b0;
+  }
+  .bubble h1, .bubble h2, .bubble h3 {
+    color: #c8d8f0;
+    margin: 10px 0 4px 0;
+    font-size: 14px;
   }
 
   /* Thinking indicator */
@@ -329,11 +395,23 @@
     <select id="reasoning-model-select"><option>Loading...</option></select>
   </div>
   <div class="bar-group">
-    <label id="upload-label">⬆ Upload Doc
-      <input type="file" id="upload-input">
+    <label id="upload-label">⬆ Upload Files
+      <input type="file" id="upload-input" multiple>
     </label>
     <span id="upload-status"></span>
   </div>
+</div>
+
+<!-- Folder Ingest Bar -->
+<div id="folder-bar">
+  <span class="bar-label">📁 Ingest folder</span>
+  <input type="text" id="folder-path-input"
+         placeholder="/absolute/path/to/folder">
+  <label class="force-label">
+    <input type="checkbox" id="force-reingest"> re-ingest already indexed
+  </label>
+  <button id="btn-ingest-folder">Ingest Folder</button>
+  <span id="folder-status"></span>
 </div>
 
 <!-- Chat Area -->
@@ -479,7 +557,6 @@ function appendMessage(role, text, intent, sources, confidence) {
     meta.appendChild(badge);
   }
 
-  // Confidence badge — only shown on assistant messages with a score
   if (confidence !== undefined && confidence !== null) {
     const isLow = confidence <= 2;
     const badge = document.createElement('span');
@@ -492,7 +569,6 @@ function appendMessage(role, text, intent, sources, confidence) {
   bubble.className = 'bubble';
   bubble.innerHTML = formatText(text);
 
-  // Low confidence warning below the answer text
   if (confidence !== undefined && confidence !== null && confidence <= 2) {
     const warn = document.createElement('span');
     warn.className = 'confidence-warn-text';
@@ -517,6 +593,9 @@ function appendMessage(role, text, intent, sources, confidence) {
 function formatText(text) {
   return text
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+    .replace(/^# (.+)$/gm, '<h1>$1</h1>')
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/`([^`]+)`/g, '<code>$1</code>')
     .replace(/\n/g, '<br>');
@@ -567,36 +646,103 @@ async function sendQuery() {
   input.focus();
 }
 
-// --- File upload ---
+// --- Multi-file upload ---
 document.getElementById('upload-input').addEventListener('change', async function() {
-  const file = this.files[0];
-  if (!file || !currentProject) return;
+  const files = Array.from(this.files);
+  if (!files.length || !currentProject) return;
 
   const status = document.getElementById('upload-status');
-  status.textContent = `Uploading ${file.name}...`;
+
+  let succeeded = 0;
+  let failed = 0;
+
+  for (const file of files) {
+    status.textContent = `Uploading ${file.name}...`;
+    status.style.color = '#6b7280';
+
+    const form = new FormData();
+    form.append('project_name', currentProject);
+    form.append('file', file);
+
+    try {
+      const res = await fetch('/ingest', { method: 'POST', body: form });
+      const data = await res.json();
+      if (data.status === 'success' || data.status === 'ingested') {
+        succeeded++;
+      } else {
+        failed++;
+        console.warn(`Failed: ${file.name} — ${data.message}`);
+      }
+    } catch(e) {
+      failed++;
+      console.warn(`Error: ${file.name} — ${e.message}`);
+    }
+  }
+
+  if (failed === 0) {
+    status.textContent = `✓ ${succeeded} file${succeeded !== 1 ? 's' : ''} ingested`;
+    status.style.color = '#7ef7b0';
+  } else {
+    status.textContent = `✓ ${succeeded} ingested, ✗ ${failed} failed`;
+    status.style.color = '#f7c07e';
+  }
+
+  this.value = '';
+  setTimeout(() => { status.textContent = ''; }, 6000);
+});
+
+// --- Folder ingest ---
+document.getElementById('btn-ingest-folder').addEventListener('click', async function() {
+  const folderPath = document.getElementById('folder-path-input').value.trim();
+  const force = document.getElementById('force-reingest').checked;
+  const status = document.getElementById('folder-status');
+
+  if (!folderPath) {
+    status.textContent = 'Enter a folder path first.';
+    status.style.color = '#f77e7e';
+    return;
+  }
+
+  if (!currentProject) {
+    status.textContent = 'Select a project first.';
+    status.style.color = '#f77e7e';
+    return;
+  }
+
+  this.disabled = true;
+  status.textContent = 'Scanning folder...';
   status.style.color = '#6b7280';
 
-  const form = new FormData();
-  form.append('project_name', currentProject);
-  form.append('file', file);
-
   try {
-    const res = await fetch('/ingest', { method: 'POST', body: form });
+    const res = await fetch('/ingest_folder', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        project_name: currentProject,
+        folder_path: folderPath,
+        force: force
+      })
+    });
+
     const data = await res.json();
-    if (data.status === 'success') {
-      status.textContent = `✓ ${file.name} (${data.chunks} chunks)`;
-      status.style.color = '#7ef7b0';
-    } else {
-      status.textContent = `✗ ${data.message || 'Failed'}`;
+
+    if (!res.ok) {
+      status.textContent = `✗ ${data.detail || 'Error'}`;
       status.style.color = '#f77e7e';
+    } else {
+      const parts = [`✓ ${data.ingested} ingested`];
+      if (data.skipped > 0) parts.push(`${data.skipped} skipped`);
+      if (data.errors > 0)  parts.push(`${data.errors} errors`);
+      status.textContent = parts.join(', ');
+      status.style.color = data.errors > 0 ? '#f7c07e' : '#7ef7b0';
     }
+
   } catch(e) {
     status.textContent = `✗ ${e.message}`;
     status.style.color = '#f77e7e';
   }
 
-  this.value = '';
-  setTimeout(() => { status.textContent = ''; }, 5000);
+  this.disabled = false;
 });
 
 // --- New project modal ---
