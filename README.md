@@ -2,7 +2,7 @@
 
 > A fully offline, agentic AI system that reads, understands, and answers questions about your private document collections — with zero data leaving your machine.
 
-![Status](https://img.shields.io/badge/Status-In%20Development-yellow)
+![Status](https://img.shields.io/badge/Status-Active%20Development-green)
 ![License](https://img.shields.io/badge/License-Apache%202.0-blue)
 ![Python](https://img.shields.io/badge/Python-3.11%2B-green)
 ![Offline](https://img.shields.io/badge/100%25-Offline-red)
@@ -35,9 +35,12 @@ Everything runs on your own hardware. No subscription. No cloud. No data ever le
 - 🔍 **Hybrid Search** — Combines semantic vector search (ChromaDB) with BM25 keyword matching. Finds both conceptual answers and exact technical terms.
 - 🤖 **Four Specialist Agents** — Router, Teacher, Troubleshooter, and Work Checker — each optimized for a different type of question.
 - 📎 **Always Cites Sources** — Every answer includes the source document and page number. Contradictions between sources are flagged explicitly.
+- 🧠 **Chain of Thought Reasoning** — Agents reason through the documents before answering, showing their work so you can follow the logic.
+- 📊 **Confidence Scoring** — Every answer includes a 1-5 confidence score. Low-confidence answers (1-2) display a visible warning to verify before acting.
 - 📁 **Multi-Project Workspaces** — Each topic gets its own isolated index, chat history, and configuration.
+- 📂 **Bulk Folder Ingestion** — Point the system at any folder on your machine and ingest hundreds of documents at once via the web UI.
 - 🖼️ **Vision Capability** — Submit photos or screenshots for live analysis using Gemma 4's native vision support.
-- 🌐 **Browser Interface** — Open WebUI provides a polished chat interface accessible from any browser on your local network.
+- 🌐 **Browser Interface** — A custom dark-themed web UI accessible from any browser on your local network. No command line needed for end users.
 - ⚙️ **One Config File** — Everything lives in a single `config.yaml`. Deploy on any OS or hardware by editing one file.
 
 ---
@@ -194,19 +197,37 @@ python setup.py
 
 All five checks should pass before continuing.
 
-### 6. Launch Open WebUI
+### 6. Launch the API Server
 
 ```bash
-docker run -d \
-  --network=host \
-  --gpus all \
-  -v open-webui:/app/backend/data \
-  --name open-webui \
-  --restart always \
-  ghcr.io/open-webui/open-webui:cuda
+uvicorn src.api.server:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-Open your browser to `http://localhost:8080` and set the Ollama URL to `http://localhost:11434`.
+Open your browser to `http://localhost:8000`.
+
+### 7. Create Your First Project
+
+1. Click **+ New** in the top bar
+2. Enter a project name (e.g. `scada-ems`)
+3. Click **Create**
+
+### 8. Ingest Documents
+
+**Single or multiple files:** Click **⬆ Upload Files** and select one or more files.
+
+**Entire folder (recommended for bulk):** Type an absolute folder path into the **📁 Ingest folder** bar and click **Ingest Folder**. The server reads documents directly from disk — no uploading required.
+
+See [docs/ADDING_DOCUMENTS.md](docs/ADDING_DOCUMENTS.md) for full details.
+
+### 9. Ask Your First Question
+
+Type a question and press Enter. The system routes it automatically:
+- **TEACH** — step-by-step instructions with citations
+- **TROUBLESHOOT** — structured diagnosis and corrective actions
+- **CHECK** — verify work against official procedures
+- **LOOKUP** — quick facts and definitions
+
+Each answer shows the intent badge, a confidence score (1-5), and the source documents used.
 
 ---
 
@@ -249,6 +270,8 @@ local-ai-doc-assistant/
 | Phase 4 | Agentic layer — four LangGraph agents | ✅ Complete |
 | Phase 5 | Team interface — FastAPI + custom web UI | ✅ Complete |
 | Phase 6 | GitHub release — tests, docs, README complete | ✅ Complete |
+| Post-6 | Chain of Thought reasoning + confidence scoring | ✅ Complete |
+| Post-6 | Bulk folder ingestion via web UI | ✅ Complete |
 
 ---
 
