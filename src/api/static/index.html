@@ -252,6 +252,26 @@
     display: block;
   }
 
+  /* History divider */
+  .history-divider {
+    max-width: 820px;
+    width: 100%;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #3a4255;
+    font-size: 11px;
+  }
+
+  .history-divider::before,
+  .history-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: #2a2f3e;
+  }
+
   .sources {
     margin-top: 8px;
     font-size: 11px;
@@ -521,14 +541,72 @@ async function loadProjects() {
     setSelectValue(sel, saved);
     currentProject = sel.value;
 
-    sel.addEventListener('change', () => {
+    // Load history for the initially selected project
+    await loadHistory(currentProject);
+
+    sel.addEventListener('change', async () => {
       currentProject = sel.value;
       savePref('selected_project', currentProject);
       clearChat();
+      await loadHistory(currentProject);
     });
 
   } catch(e) {
     console.error('Failed to load projects:', e);
+  }
+}
+
+// --- Load and display the most recent session's chat history ---
+async function loadHistory(projectName) {
+  if (!projectName) return;
+
+  try {
+    // Step 1: Get the list of sessions for this project, newest first
+    const sessRes = await fetch(`/history/${projectName}/sessions`);
+    if (!sessRes.ok) return;
+    const sessData = await sessRes.json();
+    const sessions = sessData.sessions || [];
+    if (sessions.length === 0) return;
+
+    // Step 2: Take the most recent session
+    const mostRecent = sessions[0];
+    const sessionId = mostRecent.session_id;
+
+    // Step 3: Store it so the next query continues this session
+    sessionIds[projectName] = sessionId;
+    saveSessionIds();
+
+    // Step 4: Fetch the full message history for that session
+    const histRes = await fetch(`/history/${projectName}/${sessionId}`);
+    if (!histRes.ok) return;
+    const histData = await histRes.json();
+    const messages = histData.history || [];
+    if (messages.length === 0) return;
+
+    // Step 5: Insert a divider so the user knows this is past history
+    const area = document.getElementById('chat-area');
+    const divider = document.createElement('div');
+    divider.className = 'history-divider';
+    divider.textContent = 'Previous session';
+    area.appendChild(divider);
+
+    // Step 6: Render each message using the existing appendMessage function.
+    // Only show intent/sources/confidence on assistant messages — user rows
+    // in the DB have those fields copied from the same turn but they belong
+    // to the assistant's response, not the user's question.
+    for (const msg of messages) {
+      if (msg.role === 'user') {
+        appendMessage('user', msg.content, null, null, null);
+      } else {
+        appendMessage('assistant', msg.content, msg.intent, msg.sources, null);
+      }
+    }
+
+    // Step 7: Scroll to bottom so the user sees the most recent messages
+    area.scrollTop = area.scrollHeight;
+
+  } catch(e) {
+    console.error('Failed to load history:', e);
   }
 }
 
