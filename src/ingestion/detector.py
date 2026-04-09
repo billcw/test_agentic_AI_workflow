@@ -2,32 +2,28 @@
 detector.py - File type detection for the ingestion pipeline.
 Every document entering the system is identified here first.
 """
-
 from pathlib import Path
-
 
 # Supported file types and their categories
 EXTENSION_MAP = {
     # PDFs - could be digital or scanned
     ".pdf": "pdf",
-
     # Word documents
     ".docx": "docx",
     ".doc": "docx",
-
     # Email files
     ".eml": "email",
     ".msg": "email",
-
+    # Outlook archive files
+    ".pst": "pst",
+    ".ost": "pst",
     # Excel spreadsheets
     ".xlsx": "excel",
     ".xls": "excel",
-
     # Plain text formats
     ".txt": "text",
     ".md": "text",
     ".csv": "text",
-
     # Images (for OCR)
     ".jpg": "image",
     ".jpeg": "image",
@@ -36,28 +32,23 @@ EXTENSION_MAP = {
     ".tif": "image",
 }
 
-
 def detect_file_type(file_path: str | Path) -> str:
     """
     Detect the type of a file based on its extension.
-
-    Returns a type string like 'pdf', 'docx', 'email', etc.
+    Returns a type string like 'pdf', 'docx', 'email', 'pst', etc.
     Returns 'unsupported' if the file type is not recognized.
     """
     path = Path(file_path)
     extension = path.suffix.lower()
     return EXTENSION_MAP.get(extension, "unsupported")
 
-
 def is_supported(file_path: str | Path) -> bool:
     """Return True if the file type is supported."""
     return detect_file_type(file_path) != "unsupported"
 
-
 def scan_directory(directory: str | Path) -> dict:
     """
     Scan a directory recursively and group files by type.
-
     Returns a dict like:
     {
         'pdf': [Path(...), Path(...)],
