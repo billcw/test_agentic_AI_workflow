@@ -34,10 +34,13 @@ Classify the user's message into exactly one of these four categories:
   wants help diagnosing or fixing it. Examples: "Why is X failing?",
   "I'm getting this alarm...", "Something is wrong with...", "Error: ..."
 
-- check: User wants to verify their work, confirm they did something
-  correctly, or have their procedure reviewed. Examples: "Did I do this
-  right?", "I just did X, was that correct?", "Check my work:",
-  "Verify this procedure..."
+- check: User wants to verify, review, or confirm work against a procedure.
+  The word "check" or "verify" often appears directly in the message.
+  Examples: "Check my work:", "Verify this procedure:", "Did I do this
+  right?", "Check this against the manual:", "Is this correct?",
+  "Review what I did:", "check my steps", "verify my work"
+  IMPORTANT: If the user says "check" followed by their work or steps,
+  always classify as check - not troubleshoot.
 
 - lookup: User wants a specific fact, definition, value, or quick
   reference. Everything else that doesn't fit the above three.
@@ -55,14 +58,12 @@ def classify_intent(user_message: str) -> str:
     Falls back to 'lookup' if the model returns something unexpected.
     """
     try:
+        prompt = f"{ROUTER_PROMPT}\n\nUser message: {user_message}"
         response = requests.post(
-            f"{OLLAMA['base_url']}/api/chat",
+            f"{OLLAMA['base_url']}/api/generate",
             json={
                 "model": MODELS["router_llm"],
-                "messages": [
-                    {"role": "system", "content": ROUTER_PROMPT},
-                    {"role": "user", "content": user_message}
-                ],
+                "prompt": prompt,
                 "stream": False,
                 "options": {
                     "temperature": 0.0,   # Zero temp = deterministic classification
@@ -72,7 +73,7 @@ def classify_intent(user_message: str) -> str:
             timeout=OLLAMA["timeout_seconds"]
         )
         response.raise_for_status()
-        raw = response.json()["message"]["content"].strip().lower()
+        raw = response.json()["response"].strip().lower()
 
         # Clean up in case the model adds punctuation or extra words
         intent = raw.split()[0].rstrip(".,!?") if raw else "lookup"
