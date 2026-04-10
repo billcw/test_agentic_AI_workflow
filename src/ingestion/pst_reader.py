@@ -97,13 +97,29 @@ def _extract_messages(folder, folder_path: str, source_name: str,
             if not body_text.strip() and subject == "(no subject)":
                 continue
 
+            # Build a short header stamp that will be prepended to every chunk
+            # so no chunk is ever context-free when the body spans multiple chunks.
+            header_stamp = (
+                f"[From: {sender} | Date: {date_str} | Subject: {subject}]"
+            )
+
+            # Inject the header stamp every 800 characters into the body so
+            # that every chunk produced by the chunker carries context.
+            body = body_text.strip()
+            stamped_body_parts = []
+            interval = 800
+            for pos in range(0, max(1, len(body)), interval):
+                stamped_body_parts.append(header_stamp)
+                stamped_body_parts.append(body[pos:pos + interval])
+            stamped_body = "\n".join(stamped_body_parts)
+
             # Format the page text the way the chunker expects it
             page_text = (
                 f"From: {sender}\n"
                 f"Date: {date_str}\n"
                 f"Folder: {folder_path}\n"
                 f"Subject: {subject}\n\n"
-                f"{body_text.strip()}"
+                f"{stamped_body}"
             )
 
             pages.append({
