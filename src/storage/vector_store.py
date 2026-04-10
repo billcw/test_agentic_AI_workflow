@@ -2,11 +2,15 @@
 vector_store.py - ChromaDB wrapper for semantic vector storage.
 Handles embedding generation via Ollama and vector storage/retrieval.
 """
-
 import chromadb
 from pathlib import Path
 from src.config import PATHS, MODELS, OLLAMA, RETRIEVAL
 import ollama as ollama_client
+
+# Maximum number of chunks to send to ChromaDB in a single add() call.
+# ChromaDB has an internal limit of ~5461; we use 500 to stay well clear
+# and keep memory usage low during large ingestions.
+CHROMA_BATCH_SIZE = 500
 
 
 def get_chroma_client(project_name: str):
@@ -47,8 +51,8 @@ def embed_text(text: str) -> list[float]:
 def add_chunks(project_name: str, chunks: list[dict]) -> int:
     """
     Add a list of chunks to the vector store.
-    Generates embeddings for each chunk and stores them.
-
+    Generates embeddings for each chunk and stores them in batches
+    to avoid exceeding ChromaDB's maximum batch size limit.
     Returns the number of chunks added.
     """
     if not chunks:
@@ -56,11 +60,12 @@ def add_chunks(project_name: str, chunks: list[dict]) -> int:
 
     collection = get_or_create_collection(project_name)
 
-    # Prepare data for ChromaDB
+    # Prepare data for ChromaDB — skip already-indexed chunks
     ids = []
     embeddings = []
     documents = []
     metadatas = []
+    total_added = 0
 
     for chunk in chunks:
         chunk_id = chunk["chunk_id"]
@@ -83,6 +88,22 @@ def add_chunks(project_name: str, chunks: list[dict]) -> int:
             "method": chunk["method"]
         })
 
+        # Flush to ChromaDB whenever we hit the batch size limit.
+        # This keeps memory low and avoids the 5461-item hard limit.
+        if len(ids) >= CHROMA_BATCH_SIZE:
+            collection.add(
+                ids=ids,
+                embeddings=embeddings,
+                documents=documents,
+                metadatas=metadatas
+            )
+            total_added += len(ids)
+            ids = []
+            embeddings = []
+            documents = []
+            metadatas = []
+
+    # Flush any remaining chunks that didn't fill a complete batch
     if ids:
         collection.add(
             ids=ids,
@@ -90,14 +111,14 @@ def add_chunks(project_name: str, chunks: list[dict]) -> int:
             documents=documents,
             metadatas=metadatas
         )
+        total_added += len(ids)
 
-    return len(ids)
+    return total_added
 
 
 def semantic_search(project_name: str, query: str, top_k: int = None) -> list[dict]:
     """
     Search the vector store for chunks semantically similar to the query.
-
     Returns a list of result dicts:
     [
         {
