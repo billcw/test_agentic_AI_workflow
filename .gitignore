@@ -29,3 +29,6 @@ Thumbs.db
 .pytest_cache/
 htmlcov/
 .coverage
+docs/temp/
+docs/pst/
+docs/Documents_for_ingest_first_project/
