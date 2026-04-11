@@ -415,6 +415,14 @@
     <select id="reasoning-model-select"><option>Loading...</option></select>
   </div>
   <div class="bar-group">
+    <span class="bar-label">Candidates (top_k)</span>
+    <input type="number" id="top-k-input" min="5" max="50" value="10" style="width:60px">
+  </div>
+  <div class="bar-group">
+    <span class="bar-label">Chunks to agent (top_k_final)</span>
+    <input type="number" id="top-k-final-input" min="1" max="50" value="5" style="width:60px">
+  </div>
+  <div class="bar-group">
     <label id="upload-label">⬆ Upload Files
       <input type="file" id="upload-input" multiple>
     </label>
@@ -466,6 +474,26 @@ function loadPref(key, fallback) {
 }
 function savePref(key, value) {
   try { localStorage.setItem(key, value); } catch {}
+}
+function getTopK() {
+  const val = parseInt(document.getElementById('top-k-input').value);
+  const final = parseInt(document.getElementById('top-k-final-input').value);
+  if (isNaN(val) || val < 1) return 10;
+  if (val < final) {
+    alert('Candidates (top_k) must be greater than or equal to Chunks to agent (top_k_final).');
+    return null;
+  }
+  return val;
+}
+function getTopKFinal() {
+  const val = parseInt(document.getElementById('top-k-final-input').value);
+  const topk = parseInt(document.getElementById('top-k-input').value);
+  if (isNaN(val) || val < 1) return 5;
+  if (val > topk) {
+    alert('Chunks to agent (top_k_final) must be less than or equal to Candidates (top_k).');
+    return null;
+  }
+  return val;
 }
 function loadSessionIds() {
   try { return JSON.parse(localStorage.getItem('sessionIds') || '{}'); } catch { return {}; }
@@ -705,7 +733,9 @@ async function sendQuery() {
         query: query,
         session_id: sessionId,
         router_model: document.getElementById('router-model-select').value || null,
-        reasoning_model: document.getElementById('reasoning-model-select').value || null
+        reasoning_model: document.getElementById('reasoning-model-select').value || null,
+        top_k: getTopK(),
+        top_k_final: getTopKFinal()
       })
     });
 

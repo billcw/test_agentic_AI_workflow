@@ -58,6 +58,8 @@ class QueryRequest(BaseModel):
     session_id: Optional[str] = None
     router_model: Optional[str] = None
     reasoning_model: Optional[str] = None
+    top_k: Optional[int] = None
+    top_k_final: Optional[int] = None
 
 
 class QueryResponse(BaseModel):
@@ -145,7 +147,9 @@ def query(request: QueryRequest):
         query=request.query,
         chat_history=chat_history,
         router_model=request.router_model,
-        reasoning_model=request.reasoning_model
+        reasoning_model=request.reasoning_model,
+        top_k=request.top_k,
+        top_k_final=request.top_k_final
     )
 
     save_turn(

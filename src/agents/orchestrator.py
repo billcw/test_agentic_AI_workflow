@@ -36,6 +36,8 @@ class AgentState(TypedDict):
     chat_history: list         # Prior conversation turns
     router_model: str          # Model to use for routing
     reasoning_model: str       # Model to use for specialist agents
+    top_k: int                 # Candidates from hybrid search
+    top_k_final: int           # Chunks sent to agent after reranking
 
 
 # --- Node Functions ---
@@ -57,7 +59,9 @@ def teach_node(state: AgentState) -> dict:
         project_name=state["project_name"],
         query=state["query"],
         chat_history=state.get("chat_history", []),
-        model=state.get("reasoning_model")
+        model=state.get("reasoning_model"),
+        top_k=state.get("top_k"),
+        top_k_final=state.get("top_k_final")
     )
     return {
         "answer": result["answer"],
@@ -74,7 +78,9 @@ def troubleshoot_node(state: AgentState) -> dict:
         project_name=state["project_name"],
         query=state["query"],
         chat_history=state.get("chat_history", []),
-        model=state.get("reasoning_model")
+        model=state.get("reasoning_model"),
+        top_k=state.get("top_k"),
+        top_k_final=state.get("top_k_final")
     )
     return {
         "answer": result["answer"],
@@ -91,7 +97,9 @@ def check_node(state: AgentState) -> dict:
         project_name=state["project_name"],
         query=state["query"],
         chat_history=state.get("chat_history", []),
-        model=state.get("reasoning_model")
+        model=state.get("reasoning_model"),
+        top_k=state.get("top_k"),
+        top_k_final=state.get("top_k_final")
     )
     return {
         "answer": result["answer"],
@@ -108,7 +116,9 @@ def lookup_node(state: AgentState) -> dict:
         project_name=state["project_name"],
         query=state["query"],
         chat_history=state.get("chat_history", []),
-        model=state.get("reasoning_model")
+        model=state.get("reasoning_model"),
+        top_k=state.get("top_k"),
+        top_k_final=state.get("top_k_final")
     )
     return {
         "answer": result["answer"],
@@ -182,7 +192,9 @@ agent_graph = build_graph()
 def run_agent(project_name: str, query: str,
               chat_history: list = None,
               router_model: str = None,
-              reasoning_model: str = None) -> dict:
+              reasoning_model: str = None,
+              top_k: int = None,
+              top_k_final: int = None) -> dict:
     """
     Run the full agentic pipeline for a user query.
 
@@ -210,7 +222,9 @@ def run_agent(project_name: str, query: str,
         confidence=3,
         chat_history=chat_history or [],
         router_model=router_model or "",
-        reasoning_model=reasoning_model or ""
+        reasoning_model=reasoning_model or "",
+        top_k=top_k or 0,
+        top_k_final=top_k_final or 0
     )
 
     final_state = agent_graph.invoke(initial_state)

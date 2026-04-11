@@ -95,7 +95,9 @@ def parse_confidence(answer: str) -> tuple[str, int]:
 
 def teach(project_name: str, query: str,
           chat_history: list[dict] = None,
-          model: str = None) -> dict:
+          model: str = None,
+          top_k: int = None,
+          top_k_final: int = None) -> dict:
     """
     Answer a teaching request using retrieved document chunks.
 
@@ -116,8 +118,8 @@ def teach(project_name: str, query: str,
     """
     # Step 1: Retrieve relevant chunks via hybrid search
     raw_results = hybrid_search(project_name, query,
-                                top_k=RETRIEVAL["top_k"])
-    chunks = rerank(raw_results, top_k_final=RETRIEVAL["top_k_final"])
+                                top_k=top_k or RETRIEVAL["top_k"])
+    chunks = rerank(raw_results, top_k_final=top_k_final or RETRIEVAL["top_k_final"])
 
     if not chunks:
         return {
@@ -162,7 +164,7 @@ explanation with citations. End with your CONFIDENCE rating."""
                 "stream": False,
                 "options": {
                     "temperature": 0.1,
-                    "num_predict": 1500,
+                    "num_predict": 2500,
                     "num_ctx": 8192,
                 }
             },

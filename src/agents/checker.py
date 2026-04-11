@@ -48,7 +48,9 @@ Rules you must always follow:
 
 def check(project_name: str, query: str,
           chat_history: list[dict] = None,
-          model: str = None) -> dict:
+          model: str = None,
+          top_k: int = None,
+          top_k_final: int = None) -> dict:
     """
     Verify operator work against official procedures.
 
@@ -68,8 +70,8 @@ def check(project_name: str, query: str,
     """
     # Step 1: Retrieve relevant procedure chunks
     raw_results = hybrid_search(project_name, query,
-                                top_k=RETRIEVAL["top_k"])
-    chunks = rerank(raw_results, top_k_final=RETRIEVAL["top_k_final"])
+                                top_k=top_k or RETRIEVAL["top_k"])
+    chunks = rerank(raw_results, top_k_final=top_k_final or RETRIEVAL["top_k_final"])
 
     if not chunks:
         return {
@@ -115,7 +117,7 @@ CONFIDENCE rating."""
                 "stream": False,
                 "options": {
                     "temperature": 0.1,
-                    "num_predict": 1500,
+                    "num_predict": 2500,
                     "num_ctx": 8192,
                 }
             },
