@@ -703,7 +703,9 @@ async function sendQuery() {
       body: JSON.stringify({
         project_name: currentProject,
         query: query,
-        session_id: sessionId
+        session_id: sessionId,
+        router_model: document.getElementById('router-model-select').value || null,
+        reasoning_model: document.getElementById('reasoning-model-select').value || null
       })
     });
 

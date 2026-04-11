@@ -56,6 +56,8 @@ class QueryRequest(BaseModel):
     project_name: str
     query: str
     session_id: Optional[str] = None
+    router_model: Optional[str] = None
+    reasoning_model: Optional[str] = None
 
 
 class QueryResponse(BaseModel):
@@ -141,7 +143,9 @@ def query(request: QueryRequest):
     result = run_agent(
         project_name=request.project_name,
         query=request.query,
-        chat_history=chat_history
+        chat_history=chat_history,
+        router_model=request.router_model,
+        reasoning_model=request.reasoning_model
     )
 
     save_turn(

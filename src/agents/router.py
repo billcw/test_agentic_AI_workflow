@@ -50,7 +50,7 @@ Respond with ONLY the single word category. No explanation. No punctuation.
 Just one of: teach, troubleshoot, check, lookup"""
 
 
-def classify_intent(user_message: str) -> str:
+def classify_intent(user_message: str, model: str = None) -> str:
     """
     Classify the intent of a user message using the E4B router model.
 
@@ -62,7 +62,7 @@ def classify_intent(user_message: str) -> str:
         response = requests.post(
             f"{OLLAMA['base_url']}/api/generate",
             json={
-                "model": MODELS["router_llm"],
+                "model": model or MODELS["router_llm"],
                 "prompt": prompt,
                 "stream": False,
                 "options": {

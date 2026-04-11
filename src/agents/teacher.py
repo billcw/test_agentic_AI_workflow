@@ -94,7 +94,8 @@ def parse_confidence(answer: str) -> tuple[str, int]:
 
 
 def teach(project_name: str, query: str,
-          chat_history: list[dict] = None) -> dict:
+          chat_history: list[dict] = None,
+          model: str = None) -> dict:
     """
     Answer a teaching request using retrieved document chunks.
 
@@ -156,12 +157,12 @@ explanation with citations. End with your CONFIDENCE rating."""
         response = requests.post(
             f"{OLLAMA['base_url']}/api/generate",
             json={
-                "model": MODELS["llm"],
+                "model": model or MODELS["llm"],
                 "prompt": prompt,
                 "stream": False,
                 "options": {
                     "temperature": 0.1,
-                    "num_predict": 2048,
+                    "num_predict": 1500,
                     "num_ctx": 8192,
                 }
             },
