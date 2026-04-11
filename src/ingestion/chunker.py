@@ -56,7 +56,7 @@ def chunk_text(text: str, chunk_size: int = None, chunk_overlap: int = None) -> 
                 end = boundary + 1  # Include the punctuation
 
         chunk = text[start:end].strip()
-        if chunk:
+        if chunk and len(chunk) >= 100:
             chunks.append(chunk)
 
         # Move forward by chunk_size minus overlap
