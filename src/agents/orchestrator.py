@@ -24,6 +24,8 @@ from src.agents.teacher import teach
 from src.agents.troubleshooter import troubleshoot
 from src.agents.checker import check
 from src.retrieval.multi_turn import multi_turn_retrieve
+from src.agents.critic import critique
+from src.agents.critic import critique
 
 
 # --- State Definition ---
@@ -46,6 +48,10 @@ class AgentState(TypedDict):
     retrieved_chunks: list     # Pre-retrieved chunks from retrieval node
     second_pass_fired: bool    # Whether multi-turn second pass was needed
     hybrid_weight: float       # Semantic/keyword balance (0.0-1.0)
+    critic_verdict: str        # PASS or REJECT from critic agent
+    critic_feedback: str       # Critic explanation
+    critic_verdict: str        # PASS or REJECT from critic agent
+    critic_feedback: str       # Critic explanation
 
 
 # --- Node Functions ---
@@ -164,6 +170,50 @@ def lookup_node(state: AgentState) -> dict:
     }
 
 
+def critic_node(state: AgentState) -> dict:
+    """
+    Evaluate the specialist agent response before sending to user.
+    
+    The Critic checks whether the answer adequately addresses the query
+    given the retrieved chunks. Returns PASS/REJECT with feedback.
+    For now, all responses pass through regardless of verdict -- 
+    Step 4 (iterative refinement) will use REJECT to trigger retry.
+    """
+    print(f"  [Critic] Evaluating specialist response...")
+    result = critique(
+        query=state["query"],
+        chunks=state.get("retrieved_chunks", []),
+        answer=state["answer"],
+        model=state.get("router_model") or None
+    )
+    return {
+        "critic_verdict": result["verdict"],
+        "critic_feedback": result["feedback"]
+    }
+
+
+def critic_node(state: AgentState) -> dict:
+    """
+    Evaluate the specialist agent response before sending to user.
+    
+    The Critic checks whether the answer adequately addresses the query
+    given the retrieved chunks. Returns PASS/REJECT with feedback.
+    For now, all responses pass through regardless of verdict -- 
+    Step 4 (iterative refinement) will use REJECT to trigger retry.
+    """
+    print(f"  [Critic] Evaluating specialist response...")
+    result = critique(
+        query=state["query"],
+        chunks=state.get("retrieved_chunks", []),
+        answer=state["answer"],
+        model=state.get("router_model") or None
+    )
+    return {
+        "critic_verdict": result["verdict"],
+        "critic_feedback": result["feedback"]
+    }
+
+
 def route_to_agent(state: AgentState) -> str:
     """
     Conditional edge function — tells LangGraph which node to go to next
@@ -198,6 +248,7 @@ def build_graph():
     graph.add_node("troubleshoot", troubleshoot_node)
     graph.add_node("check", check_node)
     graph.add_node("lookup", lookup_node)
+    graph.add_node("critic", critic_node)
 
     # Set entry point
     graph.set_entry_point("router")
@@ -217,11 +268,12 @@ def build_graph():
         }
     )
 
-    # All specialist nodes lead to END
-    graph.add_edge("teach", END)
-    graph.add_edge("troubleshoot", END)
-    graph.add_edge("check", END)
-    graph.add_edge("lookup", END)
+    # All specialist nodes lead to critic, critic leads to END
+    graph.add_edge("teach", "critic")
+    graph.add_edge("troubleshoot", "critic")
+    graph.add_edge("check", "critic")
+    graph.add_edge("lookup", "critic")
+    graph.add_edge("critic", END)
 
     return graph.compile()
 
@@ -272,7 +324,9 @@ def run_agent(project_name: str, query: str,
         top_k_final=top_k_final or 0,
         retrieved_chunks=[],
         second_pass_fired=False,
-        hybrid_weight=hybrid_weight or 0.0
+        hybrid_weight=hybrid_weight or 0.0,
+        critic_verdict="",
+        critic_feedback=""
     )
 
     final_state = agent_graph.invoke(initial_state)
@@ -283,5 +337,7 @@ def run_agent(project_name: str, query: str,
         "sources": final_state["sources"],
         "chunks_used": final_state["chunks_used"],
         "confidence": final_state.get("confidence", 3),
-        "second_pass_fired": final_state.get("second_pass_fired", False)
+        "second_pass_fired": final_state.get("second_pass_fired", False),
+        "critic_verdict": final_state.get("critic_verdict", ""),
+        "critic_feedback": final_state.get("critic_feedback", "")
     }
