@@ -43,9 +43,7 @@ Rules you must always follow:
 6. If you see conflicting information between documents, flag it explicitly:
    WARNING: Document A says X but Document B says Y. Verify before proceeding.
 7. End with a summary of which documents were used.
-8. On the very last line of your response, write your confidence rating in
-   this exact format (nothing else on that line):
-   CONFIDENCE: X/5 — brief reason
+8. END with exactly: CONFIDENCE: X/5
    Where X is 1 (very uncertain) to 5 (fully supported by documents)."""
 
 
@@ -168,7 +166,7 @@ explanation with citations. End with your CONFIDENCE rating."""
                 "stream": False,
                 "options": {
                     "temperature": 0.1,
-                    "num_predict": 2500,
+                    "num_predict": 3000,
                     "num_ctx": 8192,
                 }
             },
