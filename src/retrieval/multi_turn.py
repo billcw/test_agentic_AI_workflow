@@ -30,7 +30,8 @@ from src.config import RETRIEVAL
 
 def run_retrieval(project_name: str, query: str,
                   top_k: int = None,
-                  top_k_final: int = None) -> list[dict]:
+                  top_k_final: int = None,
+                  hybrid_weight: float = None) -> list[dict]:
     """
     Single-pass hybrid search + rerank.
     Returns the final chunks ready for an agent to use.
@@ -40,7 +41,8 @@ def run_retrieval(project_name: str, query: str,
     if top_k_final is None:
         top_k_final = RETRIEVAL["top_k_final"]
 
-    raw = hybrid_search(project_name, query, top_k=top_k)
+    raw = hybrid_search(project_name, query, top_k=top_k,
+                        hybrid_weight=hybrid_weight)
     return rerank(raw, top_k_final=top_k_final)
 
 
@@ -66,7 +68,8 @@ def refine_query(query: str) -> str:
 
 def multi_turn_retrieve(project_name: str, query: str,
                         top_k: int = None,
-                        top_k_final: int = None) -> tuple[list[dict], bool]:
+                        top_k_final: int = None,
+                        hybrid_weight: float = None) -> tuple[list[dict], bool]:
     """
     Full multi-turn retrieval pipeline.
 
@@ -92,7 +95,8 @@ def multi_turn_retrieve(project_name: str, query: str,
 
     # First pass
     first_chunks = run_retrieval(project_name, query,
-                                 top_k=top_k, top_k_final=top_k_final)
+                                 top_k=top_k, top_k_final=top_k_final,
+                                 hybrid_weight=hybrid_weight)
 
     print(f"  [Retrieval] First pass: {len(first_chunks)} chunks from "
           f"{len({c.get('source') for c in first_chunks})} source(s)")
@@ -108,7 +112,8 @@ def multi_turn_retrieve(project_name: str, query: str,
     print(f"  [Retrieval] Firing second pass with refined query...")
 
     refined = refine_query(query)
-    second_raw = hybrid_search(project_name, refined, top_k=top_k)
+    second_raw = hybrid_search(project_name, refined, top_k=top_k,
+                               hybrid_weight=hybrid_weight)
 
     # Merge: combine first pass raw results with second pass raw results
     # Use chunk_id as key to deduplicate -- first pass score wins on conflict

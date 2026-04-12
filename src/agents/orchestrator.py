@@ -45,6 +45,7 @@ class AgentState(TypedDict):
     top_k_final: int           # Chunks sent to agent after reranking
     retrieved_chunks: list     # Pre-retrieved chunks from retrieval node
     second_pass_fired: bool    # Whether multi-turn second pass was needed
+    hybrid_weight: float       # Semantic/keyword balance (0.0-1.0)
 
 
 # --- Node Functions ---
@@ -72,7 +73,8 @@ def retrieval_node(state: AgentState) -> dict:
         project_name=state["project_name"],
         query=state["query"],
         top_k=state.get("top_k") or None,
-        top_k_final=state.get("top_k_final") or None
+        top_k_final=state.get("top_k_final") or None,
+        hybrid_weight=state.get("hybrid_weight") or None
     )
     if second_pass:
         print(f"  [Retrieval] Second pass fired — source diversity enforced")
@@ -235,7 +237,8 @@ def run_agent(project_name: str, query: str,
               router_model: str = None,
               reasoning_model: str = None,
               top_k: int = None,
-              top_k_final: int = None) -> dict:
+              top_k_final: int = None,
+              hybrid_weight: float = None) -> dict:
     """
     Run the full agentic pipeline for a user query.
 
@@ -268,7 +271,8 @@ def run_agent(project_name: str, query: str,
         top_k=top_k or 0,
         top_k_final=top_k_final or 0,
         retrieved_chunks=[],
-        second_pass_fired=False
+        second_pass_fired=False,
+        hybrid_weight=hybrid_weight or 0.0
     )
 
     final_state = agent_graph.invoke(initial_state)
