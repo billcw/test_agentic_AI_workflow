@@ -97,7 +97,8 @@ def teach(project_name: str, query: str,
           chat_history: list[dict] = None,
           model: str = None,
           top_k: int = None,
-          top_k_final: int = None) -> dict:
+          top_k_final: int = None,
+          chunks: list = None) -> dict:
     """
     Answer a teaching request using retrieved document chunks.
 
@@ -106,6 +107,8 @@ def teach(project_name: str, query: str,
         query: The user's question or request
         chat_history: Optional list of prior messages for context
                       [{"role": "user"|"assistant", "content": "..."}]
+        chunks: Pre-retrieved chunks from retrieval_node. If provided
+                and non-empty, skips internal retrieval entirely.
 
     Returns:
         {
@@ -116,10 +119,11 @@ def teach(project_name: str, query: str,
             "intent": "teach"
         }
     """
-    # Step 1: Retrieve relevant chunks via hybrid search
-    raw_results = hybrid_search(project_name, query,
-                                top_k=top_k or RETRIEVAL["top_k"])
-    chunks = rerank(raw_results, top_k_final=top_k_final or RETRIEVAL["top_k_final"])
+    # Step 1: Use pre-retrieved chunks if provided, else retrieve now
+    if not chunks:
+        raw_results = hybrid_search(project_name, query,
+                                    top_k=top_k or RETRIEVAL["top_k"])
+        chunks = rerank(raw_results, top_k_final=top_k_final or RETRIEVAL["top_k_final"])
 
     if not chunks:
         return {

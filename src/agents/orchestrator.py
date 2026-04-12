@@ -2,15 +2,19 @@
 orchestrator.py - LangGraph workflow orchestrator.
 
 This is the single entry point for the entire agentic system.
-It wires together: Router -> appropriate specialist agent -> response.
+It wires together: Router -> Retrieval -> appropriate specialist agent -> response.
 
 How LangGraph works here (simple analogy):
 Think of it as a flowchart with named states. Each state is a function
 that does some work and returns the name of the next state to go to.
 The graph defines which states exist and which transitions are allowed.
 
-Our graph is simple:
-  START -> route -> [teach | troubleshoot | check | lookup] -> END
+Our graph (agentic-v2):
+  START -> route -> retrieval -> [teach | troubleshoot | check | lookup] -> END
+
+The retrieval node runs BEFORE the specialist agents. It performs
+multi-turn retrieval (with source diversity checking) and stores the
+chunks in state so specialists use them directly without re-retrieving.
 """
 
 from typing import TypedDict
@@ -19,6 +23,7 @@ from src.agents.router import classify_intent
 from src.agents.teacher import teach
 from src.agents.troubleshooter import troubleshoot
 from src.agents.checker import check
+from src.retrieval.multi_turn import multi_turn_retrieve
 
 
 # --- State Definition ---
@@ -38,6 +43,8 @@ class AgentState(TypedDict):
     reasoning_model: str       # Model to use for specialist agents
     top_k: int                 # Candidates from hybrid search
     top_k_final: int           # Chunks sent to agent after reranking
+    retrieved_chunks: list     # Pre-retrieved chunks from retrieval node
+    second_pass_fired: bool    # Whether multi-turn second pass was needed
 
 
 # --- Node Functions ---
@@ -52,6 +59,29 @@ def router_node(state: AgentState) -> dict:
     return {"intent": intent}
 
 
+def retrieval_node(state: AgentState) -> dict:
+    """
+    Run multi-turn retrieval before handing off to specialist agents.
+
+    This node performs source-diversity-aware retrieval so specialists
+    receive a pre-built, diverse chunk set rather than each running
+    their own single-pass retrieval independently.
+    """
+    print(f"  [Retrieval] Starting multi-turn retrieval...")
+    chunks, second_pass = multi_turn_retrieve(
+        project_name=state["project_name"],
+        query=state["query"],
+        top_k=state.get("top_k") or None,
+        top_k_final=state.get("top_k_final") or None
+    )
+    if second_pass:
+        print(f"  [Retrieval] Second pass fired — source diversity enforced")
+    return {
+        "retrieved_chunks": chunks,
+        "second_pass_fired": second_pass
+    }
+
+
 def teach_node(state: AgentState) -> dict:
     """Handle teaching requests."""
     print(f"  [Teacher] Answering teaching request...")
@@ -61,7 +91,8 @@ def teach_node(state: AgentState) -> dict:
         chat_history=state.get("chat_history", []),
         model=state.get("reasoning_model"),
         top_k=state.get("top_k"),
-        top_k_final=state.get("top_k_final")
+        top_k_final=state.get("top_k_final"),
+        chunks=state.get("retrieved_chunks", [])
     )
     return {
         "answer": result["answer"],
@@ -80,7 +111,8 @@ def troubleshoot_node(state: AgentState) -> dict:
         chat_history=state.get("chat_history", []),
         model=state.get("reasoning_model"),
         top_k=state.get("top_k"),
-        top_k_final=state.get("top_k_final")
+        top_k_final=state.get("top_k_final"),
+        chunks=state.get("retrieved_chunks", [])
     )
     return {
         "answer": result["answer"],
@@ -99,7 +131,8 @@ def check_node(state: AgentState) -> dict:
         chat_history=state.get("chat_history", []),
         model=state.get("reasoning_model"),
         top_k=state.get("top_k"),
-        top_k_final=state.get("top_k_final")
+        top_k_final=state.get("top_k_final"),
+        chunks=state.get("retrieved_chunks", [])
     )
     return {
         "answer": result["answer"],
@@ -118,7 +151,8 @@ def lookup_node(state: AgentState) -> dict:
         chat_history=state.get("chat_history", []),
         model=state.get("reasoning_model"),
         top_k=state.get("top_k"),
-        top_k_final=state.get("top_k_final")
+        top_k_final=state.get("top_k_final"),
+        chunks=state.get("retrieved_chunks", [])
     )
     return {
         "answer": result["answer"],
@@ -149,11 +183,15 @@ def build_graph():
     """
     Construct and compile the LangGraph workflow.
     Returns a compiled graph ready to invoke.
+
+    Graph flow (agentic-v2):
+      router -> retrieval -> [teach | troubleshoot | check | lookup] -> END
     """
     graph = StateGraph(AgentState)
 
     # Add all nodes
     graph.add_node("router", router_node)
+    graph.add_node("retrieval", retrieval_node)
     graph.add_node("teach", teach_node)
     graph.add_node("troubleshoot", troubleshoot_node)
     graph.add_node("check", check_node)
@@ -162,9 +200,12 @@ def build_graph():
     # Set entry point
     graph.set_entry_point("router")
 
-    # Add conditional edge from router to specialist agents
+    # Router always goes to retrieval
+    graph.add_edge("router", "retrieval")
+
+    # Retrieval fans out to specialist agents based on intent
     graph.add_conditional_edges(
-        "router",
+        "retrieval",
         route_to_agent,
         {
             "teach": "teach",
@@ -209,7 +250,8 @@ def run_agent(project_name: str, query: str,
             "intent": "teach|troubleshoot|check|lookup",
             "sources": ["file.pdf"],
             "chunks_used": 3,
-            "confidence": 4
+            "confidence": 4,
+            "second_pass_fired": True/False
         }
     """
     initial_state = AgentState(
@@ -224,7 +266,9 @@ def run_agent(project_name: str, query: str,
         router_model=router_model or "",
         reasoning_model=reasoning_model or "",
         top_k=top_k or 0,
-        top_k_final=top_k_final or 0
+        top_k_final=top_k_final or 0,
+        retrieved_chunks=[],
+        second_pass_fired=False
     )
 
     final_state = agent_graph.invoke(initial_state)
@@ -234,5 +278,6 @@ def run_agent(project_name: str, query: str,
         "intent": final_state["intent"],
         "sources": final_state["sources"],
         "chunks_used": final_state["chunks_used"],
-        "confidence": final_state.get("confidence", 3)
+        "confidence": final_state.get("confidence", 3),
+        "second_pass_fired": final_state.get("second_pass_fired", False)
     }
