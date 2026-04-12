@@ -50,8 +50,10 @@ class AgentState(TypedDict):
     hybrid_weight: float       # Semantic/keyword balance (0.0-1.0)
     critic_verdict: str        # PASS or REJECT from critic agent
     critic_feedback: str       # Critic explanation
+    refinement_attempted: bool # Whether refinement retry was attempted
     critic_verdict: str        # PASS or REJECT from critic agent
     critic_feedback: str       # Critic explanation
+    refinement_attempted: bool # Whether refinement retry was attempted
 
 
 # --- Node Functions ---
@@ -170,6 +172,97 @@ def lookup_node(state: AgentState) -> dict:
     }
 
 
+def refinement_node(state: AgentState) -> dict:
+    """
+    Check if the specialist response needs refinement based on confidence score.
+    
+    If confidence is 1-2 and no refinement attempted yet, trigger retry with
+    different retrieval strategy. Otherwise pass through to critic.
+    """
+    confidence = state.get("confidence", 3)
+    already_attempted = state.get("refinement_attempted", False)
+    
+    if confidence <= 2 and not already_attempted:
+        print(f"  [Refinement] Low confidence ({confidence}) - triggering retry...")
+        
+        # Try different hybrid weight for retry (more keyword-heavy)
+        retry_weight = max(0.1, (state.get("hybrid_weight", 0.5) - 0.3))
+        print(f"  [Refinement] Retry with hybrid_weight={retry_weight}")
+        
+        # Re-run retrieval with different weight
+        from src.retrieval.multi_turn import multi_turn_retrieve
+        chunks, second_pass = multi_turn_retrieve(
+            project_name=state["project_name"],
+            query=state["query"],
+            top_k=state.get("top_k") or None,
+            top_k_final=state.get("top_k_final") or None,
+            hybrid_weight=retry_weight
+        )
+        
+        # Re-run the same specialist with new chunks
+        intent = state["intent"]
+        if intent == "teach":
+            from src.agents.teacher import teach
+            result = teach(
+                project_name=state["project_name"],
+                query=state["query"],
+                chat_history=state.get("chat_history", []),
+                model=state.get("reasoning_model"),
+                chunks=chunks
+            )
+        elif intent == "troubleshoot":
+            from src.agents.troubleshooter import troubleshoot
+            result = troubleshoot(
+                project_name=state["project_name"],
+                query=state["query"],
+                chat_history=state.get("chat_history", []),
+                model=state.get("reasoning_model"),
+                chunks=chunks
+            )
+        elif intent == "check":
+            from src.agents.checker import check
+            result = check(
+                project_name=state["project_name"],
+                query=state["query"],
+                chat_history=state.get("chat_history", []),
+                model=state.get("reasoning_model"),
+                chunks=chunks
+            )
+        else:  # lookup
+            from src.agents.teacher import teach
+            result = teach(
+                project_name=state["project_name"],
+                query=state["query"],
+                chat_history=state.get("chat_history", []),
+                model=state.get("reasoning_model"),
+                chunks=chunks
+            )
+        
+        retry_confidence = result.get("confidence", 3)
+        print(f"  [Refinement] Retry confidence: {retry_confidence}")
+        
+        # Use better result (original vs retry)
+        if retry_confidence > confidence:
+            print(f"  [Refinement] Retry improved confidence {confidence} -> {retry_confidence}")
+            return {
+                "answer": result["answer"],
+                "sources": result["sources"],
+                "chunks_used": result["chunks_used"],
+                "confidence": retry_confidence,
+                "retrieved_chunks": chunks,
+                "refinement_attempted": True
+            }
+        else:
+            print(f"  [Refinement] Retry did not improve, keeping original")
+            return {"refinement_attempted": True}
+    else:
+        if already_attempted:
+            print(f"  [Refinement] Already attempted, passing through")
+        else:
+            print(f"  [Refinement] Confidence {confidence} acceptable, passing through")
+        return {"refinement_attempted": state.get("refinement_attempted", False)}
+
+
 def critic_node(state: AgentState) -> dict:
     """
     Evaluate the specialist agent response before sending to user.
@@ -190,6 +283,97 @@ def critic_node(state: AgentState) -> dict:
         "critic_verdict": result["verdict"],
         "critic_feedback": result["feedback"]
     }
+
+
+def refinement_node(state: AgentState) -> dict:
+    """
+    Check if the specialist response needs refinement based on confidence score.
+    
+    If confidence is 1-2 and no refinement attempted yet, trigger retry with
+    different retrieval strategy. Otherwise pass through to critic.
+    """
+    confidence = state.get("confidence", 3)
+    already_attempted = state.get("refinement_attempted", False)
+    
+    if confidence <= 2 and not already_attempted:
+        print(f"  [Refinement] Low confidence ({confidence}) - triggering retry...")
+        
+        # Try different hybrid weight for retry (more keyword-heavy)
+        retry_weight = max(0.1, (state.get("hybrid_weight", 0.5) - 0.3))
+        print(f"  [Refinement] Retry with hybrid_weight={retry_weight}")
+        
+        # Re-run retrieval with different weight
+        from src.retrieval.multi_turn import multi_turn_retrieve
+        chunks, second_pass = multi_turn_retrieve(
+            project_name=state["project_name"],
+            query=state["query"],
+            top_k=state.get("top_k") or None,
+            top_k_final=state.get("top_k_final") or None,
+            hybrid_weight=retry_weight
+        )
+        
+        # Re-run the same specialist with new chunks
+        intent = state["intent"]
+        if intent == "teach":
+            from src.agents.teacher import teach
+            result = teach(
+                project_name=state["project_name"],
+                query=state["query"],
+                chat_history=state.get("chat_history", []),
+                model=state.get("reasoning_model"),
+                chunks=chunks
+            )
+        elif intent == "troubleshoot":
+            from src.agents.troubleshooter import troubleshoot
+            result = troubleshoot(
+                project_name=state["project_name"],
+                query=state["query"],
+                chat_history=state.get("chat_history", []),
+                model=state.get("reasoning_model"),
+                chunks=chunks
+            )
+        elif intent == "check":
+            from src.agents.checker import check
+            result = check(
+                project_name=state["project_name"],
+                query=state["query"],
+                chat_history=state.get("chat_history", []),
+                model=state.get("reasoning_model"),
+                chunks=chunks
+            )
+        else:  # lookup
+            from src.agents.teacher import teach
+            result = teach(
+                project_name=state["project_name"],
+                query=state["query"],
+                chat_history=state.get("chat_history", []),
+                model=state.get("reasoning_model"),
+                chunks=chunks
+            )
+        
+        retry_confidence = result.get("confidence", 3)
+        print(f"  [Refinement] Retry confidence: {retry_confidence}")
+        
+        # Use better result (original vs retry)
+        if retry_confidence > confidence:
+            print(f"  [Refinement] Retry improved confidence {confidence} -> {retry_confidence}")
+            return {
+                "answer": result["answer"],
+                "sources": result["sources"],
+                "chunks_used": result["chunks_used"],
+                "confidence": retry_confidence,
+                "retrieved_chunks": chunks,
+                "refinement_attempted": True
+            }
+        else:
+            print(f"  [Refinement] Retry did not improve, keeping original")
+            return {"refinement_attempted": True}
+    else:
+        if already_attempted:
+            print(f"  [Refinement] Already attempted, passing through")
+        else:
+            print(f"  [Refinement] Confidence {confidence} acceptable, passing through")
+        return {"refinement_attempted": state.get("refinement_attempted", False)}
 
 
 def critic_node(state: AgentState) -> dict:
@@ -248,6 +432,7 @@ def build_graph():
     graph.add_node("troubleshoot", troubleshoot_node)
     graph.add_node("check", check_node)
     graph.add_node("lookup", lookup_node)
+    graph.add_node("refinement", refinement_node)
     graph.add_node("critic", critic_node)
 
     # Set entry point
@@ -268,11 +453,12 @@ def build_graph():
         }
     )
 
-    # All specialist nodes lead to critic, critic leads to END
-    graph.add_edge("teach", "critic")
-    graph.add_edge("troubleshoot", "critic")
-    graph.add_edge("check", "critic")
-    graph.add_edge("lookup", "critic")
+    # All specialist nodes lead to refinement, refinement -> critic -> END
+    graph.add_edge("teach", "refinement")
+    graph.add_edge("troubleshoot", "refinement")
+    graph.add_edge("check", "refinement")
+    graph.add_edge("lookup", "refinement")
+    graph.add_edge("refinement", "critic")
     graph.add_edge("critic", END)
 
     return graph.compile()
@@ -326,7 +512,8 @@ def run_agent(project_name: str, query: str,
         second_pass_fired=False,
         hybrid_weight=hybrid_weight or 0.0,
         critic_verdict="",
-        critic_feedback=""
+        critic_feedback="",
+        refinement_attempted=False
     )
 
     final_state = agent_graph.invoke(initial_state)
