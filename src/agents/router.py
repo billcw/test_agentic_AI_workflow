@@ -20,8 +20,9 @@ INTENT_TEACH = "teach"
 INTENT_TROUBLESHOOT = "troubleshoot"
 INTENT_CHECK = "check"
 INTENT_LOOKUP = "lookup"
+INTENT_SENTIMENT = "sentiment"
 
-VALID_INTENTS = {INTENT_TEACH, INTENT_TROUBLESHOOT, INTENT_CHECK, INTENT_LOOKUP}
+VALID_INTENTS = {INTENT_TEACH, INTENT_TROUBLESHOOT, INTENT_CHECK, INTENT_LOOKUP, INTENT_SENTIMENT}
 
 ROUTER_PROMPT = """You are an intent classifier for a document assistant system.
 Classify the user's message into exactly one of these four categories:
@@ -47,7 +48,7 @@ Classify the user's message into exactly one of these four categories:
   Examples: "What is...", "What does X mean?", "Who is...", "When did..."
 
 Respond with ONLY the single word category. No explanation. No punctuation.
-Just one of: teach, troubleshoot, check, lookup"""
+Just one of: teach, troubleshoot, check, sentiment, lookup"""
 
 
 def classify_intent(user_message: str, model: str = None) -> str:

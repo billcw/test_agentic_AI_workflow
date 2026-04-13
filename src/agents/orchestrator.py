@@ -25,7 +25,9 @@ from src.agents.troubleshooter import troubleshoot
 from src.agents.checker import check
 from src.retrieval.multi_turn import multi_turn_retrieve
 from src.agents.critic import critique
+from src.agents.sentiment import analyze_sentiment
 from src.agents.critic import critique
+from src.agents.sentiment import analyze_sentiment
 
 
 # --- State Definition ---
@@ -172,6 +174,26 @@ def lookup_node(state: AgentState) -> dict:
     }
 
 
+def sentiment_node(state: AgentState) -> dict:
+    """Handle sentiment analysis requests."""
+    print(f"  [Sentiment] Analyzing emotional tone...")
+    result = analyze_sentiment(
+        project_name=state["project_name"],
+        query=state["query"],
+        chat_history=state.get("chat_history", []),
+        model=state.get("reasoning_model"),
+        top_k=state.get("top_k"),
+        top_k_final=state.get("top_k_final"),
+        chunks=state.get("retrieved_chunks", [])
+    )
+    return {
+        "answer": result["answer"],
+        "sources": result["sources"],
+        "chunks_used": result["chunks_used"],
+        "confidence": result.get("confidence", 3)
+    }
+
+
 def refinement_node(state: AgentState) -> dict:
     """
     Check if the specialist response needs refinement based on confidence score.
@@ -282,6 +304,26 @@ def critic_node(state: AgentState) -> dict:
     return {
         "critic_verdict": result["verdict"],
         "critic_feedback": result["feedback"]
+    }
+
+
+def sentiment_node(state: AgentState) -> dict:
+    """Handle sentiment analysis requests."""
+    print(f"  [Sentiment] Analyzing emotional tone...")
+    result = analyze_sentiment(
+        project_name=state["project_name"],
+        query=state["query"],
+        chat_history=state.get("chat_history", []),
+        model=state.get("reasoning_model"),
+        top_k=state.get("top_k"),
+        top_k_final=state.get("top_k_final"),
+        chunks=state.get("retrieved_chunks", [])
+    )
+    return {
+        "answer": result["answer"],
+        "sources": result["sources"],
+        "chunks_used": result["chunks_used"],
+        "confidence": result.get("confidence", 3)
     }
 
 
@@ -408,6 +450,7 @@ def route_to_agent(state: AgentState) -> str:
         "teach": "teach",
         "troubleshoot": "troubleshoot",
         "check": "check",
+        "sentiment": "sentiment",
         "lookup": "lookup",
     }
     return routes.get(intent, "lookup")
@@ -432,6 +475,7 @@ def build_graph():
     graph.add_node("troubleshoot", troubleshoot_node)
     graph.add_node("check", check_node)
     graph.add_node("lookup", lookup_node)
+    graph.add_node("sentiment", sentiment_node)
     graph.add_node("refinement", refinement_node)
     graph.add_node("critic", critic_node)
 
@@ -449,6 +493,7 @@ def build_graph():
             "teach": "teach",
             "troubleshoot": "troubleshoot",
             "check": "check",
+            "sentiment": "sentiment",
             "lookup": "lookup",
         }
     )
@@ -457,6 +502,7 @@ def build_graph():
     graph.add_edge("teach", "refinement")
     graph.add_edge("troubleshoot", "refinement")
     graph.add_edge("check", "refinement")
+    graph.add_edge("sentiment", "refinement")
     graph.add_edge("lookup", "refinement")
     graph.add_edge("refinement", "critic")
     graph.add_edge("critic", END)
