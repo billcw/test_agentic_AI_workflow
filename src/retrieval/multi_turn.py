@@ -31,10 +31,12 @@ from src.config import RETRIEVAL
 def run_retrieval(project_name: str, query: str,
                   top_k: int = None,
                   top_k_final: int = None,
-                  hybrid_weight: float = None) -> list[dict]:
+                  hybrid_weight: float = None,
+                  scope: str = "all") -> list[dict]:
     """
     Single-pass hybrid search + rerank.
     Returns the final chunks ready for an agent to use.
+    scope: 'email', 'document', or 'all' -- filters retrieval by source type.
     """
     if top_k is None:
         top_k = RETRIEVAL["top_k"]
@@ -42,7 +44,7 @@ def run_retrieval(project_name: str, query: str,
         top_k_final = RETRIEVAL["top_k_final"]
 
     raw = hybrid_search(project_name, query, top_k=top_k,
-                        hybrid_weight=hybrid_weight)
+                        hybrid_weight=hybrid_weight, scope=scope)
     return rerank(raw, top_k_final=top_k_final)
 
 
@@ -69,7 +71,8 @@ def refine_query(query: str) -> str:
 def multi_turn_retrieve(project_name: str, query: str,
                         top_k: int = None,
                         top_k_final: int = None,
-                        hybrid_weight: float = None) -> tuple[list[dict], bool]:
+                        hybrid_weight: float = None,
+                        scope: str = "all") -> tuple[list[dict], bool]:
     """
     Full multi-turn retrieval pipeline.
 
@@ -96,7 +99,7 @@ def multi_turn_retrieve(project_name: str, query: str,
     # First pass
     first_chunks = run_retrieval(project_name, query,
                                  top_k=top_k, top_k_final=top_k_final,
-                                 hybrid_weight=hybrid_weight)
+                                 hybrid_weight=hybrid_weight, scope=scope)
 
     print(f"  [Retrieval] First pass: {len(first_chunks)} chunks from "
           f"{len({c.get('source') for c in first_chunks})} source(s)")
@@ -113,7 +116,7 @@ def multi_turn_retrieve(project_name: str, query: str,
 
     refined = refine_query(query)
     second_raw = hybrid_search(project_name, refined, top_k=top_k,
-                               hybrid_weight=hybrid_weight)
+                               hybrid_weight=hybrid_weight, scope=scope)
 
     # Merge: combine first pass raw results with second pass raw results
     # Use chunk_id as key to deduplicate -- first pass score wins on conflict

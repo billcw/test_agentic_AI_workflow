@@ -16,7 +16,7 @@ Our graph (agentic-v2):
 
 from typing import TypedDict
 from langgraph.graph import StateGraph, END
-from src.agents.router import classify_intent
+from src.agents.router import classify_intent, classify_scope
 from src.agents.teacher import teach
 from src.agents.troubleshooter import troubleshoot
 from src.agents.checker import check
@@ -46,16 +46,17 @@ class AgentState(TypedDict):
     critic_verdict: str
     critic_feedback: str
     refinement_attempted: bool
+    scope: str
 
 
 # --- Node Functions ---
 
 def router_node(state: AgentState) -> dict:
-    """Classify the user intent and store it in state."""
+    """Classify the user intent and scope, store both in state."""
     print(f"  [Router] Classifying: '{state['query'][:60]}...'")
     intent = classify_intent(state["query"], model=state.get("router_model"))
-    print(f"  [Router] Intent: {intent}")
-    return {"intent": intent}
+    scope = classify_scope(state["query"], model=state.get("router_model"))
+    return {"intent": intent, "scope": scope}
 
 
 def retrieval_node(state: AgentState) -> dict:
@@ -70,7 +71,8 @@ def retrieval_node(state: AgentState) -> dict:
         query=state["query"],
         top_k=state.get("top_k") or None,
         top_k_final=state.get("top_k_final") or None,
-        hybrid_weight=state.get("hybrid_weight") or None
+        hybrid_weight=state.get("hybrid_weight") or None,
+        scope=state.get("scope", "all")
     )
     if second_pass:
         print(f"  [Retrieval] Second pass fired - source diversity enforced")
@@ -372,7 +374,8 @@ def run_agent(project_name: str, query: str,
         hybrid_weight=hybrid_weight or 0.0,
         critic_verdict="",
         critic_feedback="",
-        refinement_attempted=False
+        refinement_attempted=False,
+        scope="all"
     )
 
     final_state = agent_graph.invoke(initial_state)

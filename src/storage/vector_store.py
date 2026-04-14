@@ -116,7 +116,8 @@ def add_chunks(project_name: str, chunks: list[dict]) -> int:
     return total_added
 
 
-def semantic_search(project_name: str, query: str, top_k: int = None) -> list[dict]:
+def semantic_search(project_name: str, query: str, top_k: int = None,
+                    where: dict = None) -> list[dict]:
     """
     Search the vector store for chunks semantically similar to the query.
     Returns a list of result dicts:
@@ -142,10 +143,13 @@ def semantic_search(project_name: str, query: str, top_k: int = None) -> list[di
 
     query_embedding = embed_text(query)
 
-    results = collection.query(
-        query_embeddings=[query_embedding],
-        n_results=min(top_k, collection.count())
-    )
+    query_kwargs = {
+        "query_embeddings": [query_embedding],
+        "n_results": min(top_k, collection.count())
+    }
+    if where is not None:
+        query_kwargs["where"] = where
+    results = collection.query(**query_kwargs)
 
     output = []
     for i in range(len(results["ids"][0])):

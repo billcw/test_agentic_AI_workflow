@@ -25,7 +25,8 @@ from src.config import RETRIEVAL
 def hybrid_search(project_name: str, query: str,
                   top_k: int = None,
                   hybrid_weight: float = None,
-                  mmr_diversity: float = 0.3) -> list[dict]:
+                  mmr_diversity: float = 0.3,
+                  scope: str = "all") -> list[dict]:
     """
     Search using both semantic and keyword search, combining scores.
     Each search returns scores normalized to 0.0-1.0.
@@ -42,8 +43,8 @@ def hybrid_search(project_name: str, query: str,
     if hybrid_weight is None:
         hybrid_weight = RETRIEVAL["hybrid_weight"]
 
-    semantic_results = semantic_search(project_name, query, top_k=top_k)
-    keyword_results = keyword_search(project_name, query, top_k=top_k)
+    semantic_results = semantic_search(project_name, query, top_k=top_k, scope=scope)
+    keyword_results = keyword_search(project_name, query, top_k=top_k, scope=scope)
 
     semantic_map = {r["chunk_id"]: r for r in semantic_results}
     keyword_map = {r["chunk_id"]: r for r in keyword_results}
