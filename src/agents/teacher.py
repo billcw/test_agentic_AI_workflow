@@ -79,7 +79,7 @@ def parse_confidence(answer: str) -> tuple[str, int]:
         the operator reads. Keeping them separate makes both cleaner.
     """
     # Match "CONFIDENCE: X/5 — anything" at end of response
-    pattern = r'\nCONFIDENCE:\s*([1-5])/5[^\n]*$'
+    pattern = r'[\n\r]?\s*CONFIDENCE:\s*([1-5])/5[^\n]*$'
     match = re.search(pattern, answer.strip(), re.IGNORECASE)
 
     if match:
