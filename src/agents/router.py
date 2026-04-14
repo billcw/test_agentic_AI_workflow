@@ -1,8 +1,13 @@
 """
 router.py - Intent classification agent.
 Uses Gemma 4 E4B (the fast/small model) to classify every incoming
-user message into one of four intent categories before routing to
-the appropriate specialist agent.
+user message into intent and scope before routing to the appropriate
+specialist agent.
+
+Why two separate calls?
+Each call is a single focused classification task. Asking the model
+to return two things at once increases parsing complexity and reduces
+reliability. Two simple calls beats one complex call every time.
 
 Why E4B here instead of 31B?
 Routing is a simple classification task -- it does not need deep
@@ -19,7 +24,12 @@ INTENT_LOOKUP = "lookup"
 INTENT_SENTIMENT = "sentiment"
 VALID_INTENTS = {INTENT_TEACH, INTENT_TROUBLESHOOT, INTENT_CHECK, INTENT_LOOKUP, INTENT_SENTIMENT}
 
-ROUTER_PROMPT = """You are an intent classifier for a document assistant system.
+SCOPE_EMAIL = "email"
+SCOPE_DOCUMENT = "document"
+SCOPE_ALL = "all"
+VALID_SCOPES = {SCOPE_EMAIL, SCOPE_DOCUMENT, SCOPE_ALL}
+
+INTENT_PROMPT = """You are an intent classifier for a document assistant system.
 Classify the user message into exactly one of these five categories:
 
 - teach: User wants to learn how to do something, understand a procedure,
@@ -51,15 +61,39 @@ Classify the user message into exactly one of these five categories:
 Respond with ONLY the single word category. No explanation. No punctuation.
 Just one of: teach, troubleshoot, check, sentiment, lookup"""
 
+SCOPE_PROMPT = """You are a search scope classifier for a document assistant system.
+The system has two types of documents: emails and technical manuals/documents.
 
-def classify_intent(user_message: str, model: str = None) -> str:
+Classify the user message into exactly one of these three search scopes:
+
+- email: User is asking about communications, messages, inbox, emails, or
+  anything that would be found in an email archive. Examples:
+  Show me urgent communications, What emails mention the outage?,
+  Find messages about the alarm, Are there any emails from John?,
+  Show me communications about the FEP issue, urgent messages,
+  What did the team say about X?, correspondence about Y.
+
+- document: User is asking about procedures, manuals, configurations,
+  technical specifications, or anything found in technical documents.
+  Examples: How do I configure X?, What does the manual say about Y?,
+  Show me the procedure for Z, What are the alarm setpoints?,
+  Find the configuration steps, technical specifications for X.
+
+- all: User is asking broadly across all sources, or the scope is
+  ambiguous and could apply to either emails or documents.
+  Examples: What do we know about X?, Find everything about Y,
+  Search all sources for Z, What information exists about X?
+
+Respond with ONLY the single word scope. No explanation. No punctuation.
+Just one of: email, document, all"""
+
+
+def _call_router(prompt: str, valid_values: set, default: str, model: str = None) -> str:
     """
-    Classify the intent of a user message using the E4B router model.
-    Returns one of: teach, troubleshoot, check, sentiment, lookup
-    Falls back to lookup if the model returns something unexpected.
+    Internal helper: make a single focused classification call to the router model.
+    Returns one of the valid_values, or default if the model returns something unexpected.
     """
     try:
-        prompt = ROUTER_PROMPT + "\n\nUser message: " + user_message
         response = requests.post(
             OLLAMA["base_url"] + "/api/generate",
             json={
@@ -75,12 +109,36 @@ def classify_intent(user_message: str, model: str = None) -> str:
         )
         response.raise_for_status()
         raw = response.json()["response"].strip().lower()
-        intent = raw.split()[0].rstrip(".,!?") if raw else "lookup"
-        if intent in VALID_INTENTS:
-            return intent
+        result = raw.split()[0].rstrip(".,!?") if raw else default
+        if result in valid_values:
+            return result
         else:
-            print("  [Router] Unexpected intent: " + intent + ", defaulting to lookup")
-            return INTENT_LOOKUP
+            print("  [Router] Unexpected value: " + result + ", defaulting to " + default)
+            return default
     except Exception as e:
         print("  [Router] Error during classification: " + str(e))
-        return INTENT_LOOKUP
+        return default
+
+
+def classify_intent(user_message: str, model: str = None) -> str:
+    """
+    Classify the intent of a user message using the E4B router model.
+    Returns one of: teach, troubleshoot, check, sentiment, lookup
+    Falls back to lookup if the model returns something unexpected.
+    """
+    prompt = INTENT_PROMPT + "\n\nUser message: " + user_message
+    intent = _call_router(prompt, VALID_INTENTS, INTENT_LOOKUP, model)
+    print("  [Router] Intent: " + intent)
+    return intent
+
+
+def classify_scope(user_message: str, model: str = None) -> str:
+    """
+    Classify the search scope of a user message using the E4B router model.
+    Returns one of: email, document, all
+    Falls back to all if the model returns something unexpected.
+    """
+    prompt = SCOPE_PROMPT + "\n\nUser message: " + user_message
+    scope = _call_router(prompt, VALID_SCOPES, SCOPE_ALL, model)
+    print("  [Router] Scope: " + scope)
+    return scope
