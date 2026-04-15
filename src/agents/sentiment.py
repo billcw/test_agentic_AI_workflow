@@ -1,114 +1,117 @@
 """
 sentiment.py - Sentiment analysis agent for agentic-v2.
 
-Analyzes emotional tone, mood, and sentiment in documents, especially
-emails and social media posts. Uses LLM analysis with bag-of-words
-fallback if the model fails to respond.
+Analyzes emotional tone, urgency, and mood in retrieved documents.
+Uses the 31B reasoning model for deep analysis, with a keyword-based
+fallback if the LLM call fails.
 
-Use cases:
-- Find emails by emotional tone: "Show me angry emails from Q3"
-- Analyze document sentiment: "What's the mood in these posts?"
-- Search by emotional markers: "Find frustrated communications"
+Why LLM-first for sentiment?
+Keyword counting is brittle -- "not urgent" contains the word "urgent"
+and would score as urgent. The LLM understands context and nuance that
+simple word matching cannot.
 """
-
 import requests
 from src.config import OLLAMA, MODELS, RETRIEVAL
 from src.retrieval.hybrid_search import hybrid_search
 from src.retrieval.reranker import rerank
 from src.agents.teacher import build_context, parse_confidence
 
+SENTIMENT_PROMPT = """You are a sentiment and tone analysis specialist.
+Analyze the emotional tone, urgency, and mood expressed in the provided documents.
 
-SENTIMENT_PROMPT = """You are a sentiment analysis assistant.
-Analyze the emotional tone of the provided document excerpts.
+Your analysis must include:
+1. Overall sentiment: Positive, Negative, Neutral, Mixed, or Urgent
+2. Key emotional themes detected (frustration, satisfaction, urgency, concern, etc.)
+3. Notable examples from the text that support your assessment
+4. Any communications that require immediate attention or escalation
 
-Categories to identify:
-- Positive: happy, excited, satisfied, grateful, optimistic
-- Negative: angry, frustrated, disappointed, worried, upset
-- Neutral: factual, professional, informational
-- Urgent: time-sensitive, emergency, immediate action needed
-- Humorous: funny, joking, sarcastic, witty
+Always cite the source document for each observation.
+Be specific -- quote or closely paraphrase the relevant passages.
 
-For each document excerpt, identify the primary sentiment category
-and provide specific examples of emotional language.
+End your response with:
+CONFIDENCE: X/5 -- brief reason
 
-End with: CONFIDENCE: X/5
-Where X is your confidence in the sentiment analysis."""
+Where X is your confidence that the retrieved documents are sufficient
+to answer the user query (1=insufficient, 5=comprehensive coverage)."""
+
+
+def _keyword_fallback(chunks: list) -> tuple[str, int]:
+    """
+    Simple keyword-based fallback if LLM call fails.
+    Returns (summary_text, confidence_score).
+    """
+    positive_words = ["good", "great", "excellent", "happy", "pleased", "thank", "resolved"]
+    negative_words = ["bad", "terrible", "frustrated", "angry", "problem", "issue", "failed"]
+    urgent_words = ["urgent", "asap", "immediately", "emergency", "critical", "escalate"]
+
+    total_text = " ".join([chunk.get("text", "") for chunk in chunks]).lower()
+
+    pos_count = sum(1 for word in positive_words if word in total_text)
+    neg_count = sum(1 for word in negative_words if word in total_text)
+    urg_count = sum(1 for word in urgent_words if word in total_text)
+
+    if urg_count > 0:
+        primary = "Urgent"
+    elif neg_count > pos_count:
+        primary = "Negative"
+    elif pos_count > 0:
+        primary = "Positive"
+    else:
+        primary = "Neutral"
+
+    summary = (f"Keyword-based sentiment analysis of {len(chunks)} documents:\n\n"
+               f"Primary sentiment: {primary}\n"
+               f"Indicators: {pos_count} positive, {neg_count} negative, {urg_count} urgent")
+    return summary, 2
 
 
 def analyze_sentiment(project_name: str, query: str,
-                     chat_history: list = None,
-                     model: str = None,
-                     top_k: int = None,
-                     top_k_final: int = None,
-                     chunks: list = None) -> dict:
-    """
-    Analyze sentiment in documents matching the query.
+                      chat_history: list = None,
+                      model: str = None,
+                      top_k: int = None,
+                      top_k_final: int = None,
+                      chunks: list = None) -> dict:
+    """Analyze sentiment and emotional tone in retrieved documents."""
 
-    Args:
-        project_name: Which workspace to search
-        query: Sentiment search query (e.g., "Find angry emails")
-        chunks: Pre-retrieved chunks from retrieval_node
-
-    Returns:
-        {
-            "answer": "Sentiment analysis with examples...",
-            "sources": ["email1.pst", "posts.txt"],
-            "chunks_used": 5,
-            "confidence": 4,
-            "intent": "sentiment"
-        }
-    """
-    # Step 1: Use pre-retrieved chunks if provided, else retrieve now
     if not chunks:
-        raw_results = hybrid_search(project_name, query,
-                                    top_k=top_k or RETRIEVAL["top_k"])
-        chunks = rerank(raw_results, top_k_final=top_k_final or RETRIEVAL["top_k_final"])
+        raw_results = hybrid_search(project_name, query, top_k=top_k or 15)
+        chunks = rerank(raw_results, top_k_final=top_k_final or 10)
 
     if not chunks:
         return {
-            "answer": ("I could not find relevant documents to analyze for sentiment. "
-                       "Please ensure documents with emotional content have been ingested."),
+            "answer": "No documents found for sentiment analysis.",
             "sources": [],
             "chunks_used": 0,
             "confidence": 1,
             "intent": "sentiment"
         }
 
-    # Step 2: Build context block from retrieved chunks
     context = build_context(chunks)
 
-    # Step 3: Build prompt
     history_text = ""
     if chat_history:
-        for msg in chat_history:
-            role = msg.get("role", "user").capitalize()
-            history_text += f"{role}: {msg.get('content', '')}\n"
-"
+        for turn in chat_history[-3:]:
+            role = turn.get("role", "user")
+            text = turn.get("content", "")
+            history_text += f"{role.capitalize()}: {text}\n"
 
-    prompt = f"""{SENTIMENT_PROMPT}
+    prompt = SENTIMENT_PROMPT
+    if history_text:
+        prompt += f"\n\nConversation history:\n{history_text}"
+    prompt += f"\n\nDocuments to analyze:\n{context}"
+    prompt += f"\n\nUser query: {query}"
+    prompt += "\n\nProvide your sentiment analysis with specific citations:"
 
-{history_text}
---- DOCUMENT EXCERPTS ---
-{context}
---- END OF EXCERPTS ---
-
-Query: {query}
-
-Analyze the sentiment in these documents. Identify emotional tone and provide
-specific examples. End with CONFIDENCE rating."""
-
-    # Step 4: Try LLM analysis (simplified to avoid empty responses)
     try:
         response = requests.post(
-            f"{OLLAMA['base_url']}/api/generate",
+            OLLAMA["base_url"] + "/api/generate",
             json={
                 "model": model or MODELS["llm"],
                 "prompt": prompt,
                 "stream": False,
                 "options": {
-                    "temperature": 0.1,
-                    "num_predict": 1500,
-                    "num_ctx": 8192,
+                    "temperature": 0.3,
+                    "num_predict": MODELS.get("num_predict", 3000),
                 }
             },
             timeout=OLLAMA["timeout_seconds"]
@@ -116,55 +119,21 @@ specific examples. End with CONFIDENCE rating."""
         response.raise_for_status()
         raw_answer = response.json()["response"].strip()
 
-        if raw_answer:  # LLM returned content
+        if not raw_answer:
+            print("  [Sentiment] LLM returned empty response, using keyword fallback")
+            answer, confidence = _keyword_fallback(chunks)
+        else:
             answer, confidence = parse_confidence(raw_answer)
-            sources = list({chunk.get("source", "unknown") for chunk in chunks})
-            
-            return {
-                "answer": answer,
-                "sources": sources,
-                "chunks_used": len(chunks),
-                "confidence": confidence,
-                "intent": "sentiment"
-            }
 
     except Exception as e:
-        print(f"  [Sentiment] LLM error: {e}, using simplified analysis")
-
-    # Step 5: Simplified text analysis fallback
-    print(f"  [Sentiment] Using simplified sentiment analysis")
-    
-    # Basic emotional keyword detection
-    positive_words = ["good", "great", "excellent", "happy", "pleased", "thank"]
-    negative_words = ["bad", "terrible", "frustrated", "angry", "problem", "issue"]
-    urgent_words = ["urgent", "asap", "immediately", "emergency", "critical"]
-    
-    total_text = " ".join([chunk.get("text", "") for chunk in chunks]).lower()
-    
-    pos_count = sum(1 for word in positive_words if word in total_text)
-    neg_count = sum(1 for word in negative_words if word in total_text) 
-    urg_count = sum(1 for word in urgent_words if word in total_text)
-    
-    if neg_count > pos_count:
-        primary_sentiment = "Negative"
-    elif pos_count > 0:
-        primary_sentiment = "Positive"
-    elif urg_count > 0:
-        primary_sentiment = "Urgent"
-    else:
-        primary_sentiment = "Neutral"
-    
-    answer = f"Sentiment analysis of {len(chunks)} documents:\n\n"
-    answer += f"Primary sentiment detected: **{primary_sentiment}**\n\n"
-    answer += f"Analyzed {len(chunks)} chunks from {len(set(c.get('source') for c in chunks))} sources.\n"
-    answer += f"Positive indicators: {pos_count}, Negative: {neg_count}, Urgent: {urg_count}"
+        print(f"  [Sentiment] LLM call failed: {e}, using keyword fallback")
+        answer, confidence = _keyword_fallback(chunks)
 
     sources = list({chunk.get("source", "unknown") for chunk in chunks})
-
     return {
         "answer": answer,
         "sources": sources,
         "chunks_used": len(chunks),
-        "confidence": 3,
+        "confidence": confidence,
         "intent": "sentiment"
     }
