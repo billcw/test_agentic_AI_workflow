@@ -19,6 +19,7 @@ Why gemma4:e4b for classification?
 """
 
 import re
+import base64
 import shutil
 import requests
 from pathlib import Path
@@ -109,12 +110,86 @@ def _extract_text(file_path: Path, max_chars: int = 2000) -> Optional[str]:
             combined = " ".join(c.get("text", "") for c in chunks)
             return combined[:max_chars]
 
+        # Images — use gemma4:e4b vision to describe content
+        if suffix in (".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"):
+            return _describe_image(file_path)
+
         # Unknown type — fall through to filename-only classification
         return None
 
     except Exception:
         # If any reader fails, fall through to filename-only classification.
         # We don't want a single unreadable file to abort the whole batch.
+        return None
+
+
+# ── Image vision description ─────────────────────────────────────────────────
+
+def _describe_image(file_path: Path) -> Optional[str]:
+    """
+    Use gemma4:e4b vision to generate a plain-language description of an image.
+
+    Returns a text description (e.g. "a formal portrait photo of a person
+    in business attire with a serious expression") or None if the call fails.
+
+    Why two-step (describe then classify)?
+      Separating visual interpretation from category selection gives better
+      results than asking the model to do both at once. The description feeds
+      into _classify_file() exactly like PDF or email text does, so the
+      category-accumulation logic works normally.
+
+    Why base64?
+      Ollama's vision API requires the image to be passed as a base64-encoded
+      string in the "images" field of the /api/generate request body.
+    """
+    base_url = OLLAMA.get("base_url", "http://localhost:11434")
+    model = MODELS.get("router_llm", "gemma4:e4b")
+    timeout = OLLAMA.get("timeout_seconds", 3600)
+
+    try:
+        image_data = base64.b64encode(file_path.read_bytes()).decode("utf-8")
+
+        # Determine MIME type for the prompt context
+        suffix = file_path.suffix.lower()
+        mime_map = {
+            ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+            ".png": "image/png", ".gif": "image/gif",
+            ".webp": "image/webp", ".bmp": "image/bmp",
+        }
+        mime_type = mime_map.get(suffix, "image/jpeg")
+
+        prompt = (
+            "Describe the content of this image in 1-3 sentences. "
+            "Focus on what the image is ABOUT — the subject matter, "
+            "topic, or category it belongs to. "
+            "Do not describe colors, composition, or technical qualities. "
+            "Just describe what you see in plain language."
+        )
+
+        response = requests.post(
+            f"{base_url}/api/generate",
+            json={
+                "model": model,
+                "prompt": prompt,
+                "images": [image_data],
+                "stream": False,
+                "options": {
+                    "temperature": 0.0,
+                    "num_predict": 500,
+                }
+            },
+            timeout=timeout
+        )
+        response.raise_for_status()
+        description = response.json().get("response", "").strip()
+
+        if not description:
+            return None
+
+        return description[:2000]
+
+    except Exception:
+        # Fall through to filename-only classification if vision call fails
         return None
 
 
