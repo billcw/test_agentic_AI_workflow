@@ -30,39 +30,150 @@ from src.retrieval.reranker import rerank
 
 
 TEACHER_SYSTEM_PROMPT = """You are a technical training assistant for SCADA/EMS operations.
-Your job is to teach procedures clearly and accurately based ONLY on the
-provided document excerpts.
+Your job is to teach procedures accurately based ONLY on the provided document excerpts.
 
-Rules you must always follow:
-1. Before giving your final answer, briefly think through what the documents
-   say about this topic and what the key points are. Show this reasoning.
-2. Base your answer ONLY on the provided document excerpts. Do not invent steps.
-3. Cite your source for each major step or claim, like this: [Source: filename.pdf, p.2]
-4. If the documents don't contain enough information to answer fully, say so explicitly.
-5. Structure your response as numbered steps when explaining a procedure.
-6. If you see conflicting information between documents, flag it explicitly:
-   WARNING: Document A says X but Document B says Y. Verify before proceeding.
-7. End with a summary of which documents were used.
-8. On the very last line of your response, write your confidence rating in
-   this exact format (nothing else on that line):
-   CONFIDENCE: X/5 — brief reason
-   Where X is 1 (very uncertain) to 5 (fully supported by documents)."""
+CRITICAL RULES — violating these is worse than giving no answer:
+1. THINK FIRST: Before answering, briefly note what each excerpt actually says.
+   Do not summarize what you know about the topic — only what the excerpts say.
+2. ONLY WHAT IS WRITTEN: Every step you provide must be directly stated in an excerpt.
+   If a step is implied but not explicitly written, DO NOT include it.
+   Do not use your general knowledge to fill gaps between steps.
+3. CITE EVERY STEP: After each step, cite its source like this: [Source: filename.pdf, p.2]
+   If you cannot cite a step, remove it from your answer.
+4. INCOMPLETE IS HONEST: If the excerpts only cover part of a procedure, say explicitly:
+   "The provided documents cover steps X through Y only. Steps Z onward are not in the excerpts."
+   Do NOT complete the procedure from memory.
+5. NEVER SYNTHESIZE: Do not combine fragments from different excerpts into a procedure
+   that no single document states end-to-end. If the full procedure is not in one source,
+   present only what each source explicitly states, separately.
+6. CONTRADICTIONS: If documents conflict, flag it:
+   WARNING: [source A] says X but [source B] says Y. Verify before proceeding.
+7. STRUCTURE: Use numbered steps for procedures. Plain paragraphs for explanations.
+8. CLOSE WITH: A one-line list of documents used, then exactly: CONFIDENCE: X/5
+   Where X reflects how completely the excerpts support your answer (not your general knowledge)."""
 
 
-def build_context(chunks: list[dict]) -> str:
+def _clean_chunk_text(text: str, max_chars: int = 600) -> str:
+    """
+    Clean a single chunk's text before feeding it to the LLM.
+
+    Why this matters:
+    PST email archives contain large amounts of content that is useless
+    to the LLM and consumes precious context window tokens:
+    - urldefense.com encoded URLs: long base64-like strings that carry
+      no semantic meaning (e.g. urldefense.com/v3/__https://u1107...)
+    - mailto: encoded link fragments scattered throughout reply chains
+    - Lines of pure alphanumeric noise (base64, encoded tokens, etc.)
+    - Excessive blank lines from email formatting
+
+    With num_ctx=8192, feeding 10 chunks of raw noisy email text can
+    overflow the context window, causing the model to loop and repeat
+    phrases endlessly. Capping at 600 chars per chunk after cleaning
+    keeps total context well within safe limits while preserving the
+    meaningful content the LLM actually needs.
+
+    Args:
+        text: Raw chunk text from ChromaDB
+        max_chars: Maximum characters to keep after cleaning (default 600)
+
+    Returns:
+        Cleaned, truncated text. Empty string if nothing useful remains.
+    """
+    if not text:
+        return ""
+
+    # Remove urldefense.com encoded URLs entirely — these are never
+    # useful to the LLM. They look like:
+    # https://urldefense.com/v3/__https://u11074663.ct.sendgrid...
+    text = re.sub(r'https?://urldefense\.com\S+', '[URL removed]', text)
+
+    # Remove mailto: encoded links — fragments like:
+    # <mailto:Victoria.Robinson@lge-ku.com>
+    text = re.sub(r'<mailto:[^>]+>', '', text)
+
+    # Remove bare mailto: references without angle brackets
+    text = re.sub(r'mailto:\S+', '', text)
+
+    # Remove lines that are pure encoded noise — lines with no spaces
+    # and longer than 40 characters are almost always base64/token garbage
+    lines = text.split('\n')
+    cleaned_lines = []
+    for line in lines:
+        stripped = line.strip()
+        # Keep the line if it has spaces (real text) or is short
+        if ' ' in stripped or len(stripped) <= 40:
+            cleaned_lines.append(line)
+        # Otherwise it's likely an encoded token — skip it
+    text = '\n'.join(cleaned_lines)
+
+    # Collapse runs of 3+ blank lines down to a single blank line
+    text = re.sub(r'\n{3,}', '\n\n', text)
+
+    # Collapse runs of whitespace within lines
+    text = re.sub(r'[ \t]{2,}', ' ', text)
+
+    # Strip leading/trailing whitespace
+    text = text.strip()
+
+    # Cap at max_chars — truncate with an ellipsis so the LLM knows
+    # the text continues beyond what it can see
+    if len(text) > max_chars:
+        text = text[:max_chars].rstrip() + "..."
+
+    return text
+
+
+def build_context(chunks: list[dict],
+                  email_max_chars: int = 600,
+                  doc_max_chars: int = 600) -> str:
     """
     Format retrieved chunks into a context block for the LLM prompt.
     Each chunk is labeled with its source so the model can cite it.
+
+    Chunks are cleaned before assembly to remove URL-encoded noise
+    and capped at email_max_chars or doc_max_chars depending on the
+    chunk's 'method' metadata field ('email' vs 'digital'/'ocr').
+    Chunks that are empty after cleaning are skipped entirely.
+
+    Args:
+        chunks: Retrieved chunk dicts from hybrid search / reranker
+        email_max_chars: Character cap for email chunks (default 600)
+        doc_max_chars: Character cap for document chunks (default 600)
     """
     if not chunks:
         return "No relevant documents found."
 
     parts = []
+    skipped = 0
     for i, chunk in enumerate(chunks, 1):
         source = chunk.get("source", "unknown")
         page = chunk.get("page", "?")
         text = chunk.get("text", "")
-        parts.append(f"[Excerpt {i} — Source: {source}, Page {page}]\n{text}")
+        method = chunk.get("method", "digital")
+
+        # Choose cap based on chunk type — email chunks tend to be
+        # noisier so they may warrant a different cap than clean PDFs
+        if method == "email":
+            cap = email_max_chars
+        else:
+            cap = doc_max_chars
+
+        cleaned = _clean_chunk_text(text, max_chars=cap)
+
+        if not cleaned or len(cleaned) < 20:
+            skipped += 1
+            continue
+
+        parts.append(f"[Excerpt {i} — Source: {source}, Page {page}]\n{cleaned}")
+
+    if skipped > 0:
+        print(f"  [Context] Skipped {skipped} empty/noise chunks after cleaning")
+
+    if not parts:
+        return "No usable document content found after filtering noise."
+
+    print(f"  [Context] Built context from {len(parts)} chunks, "
+          f"~{sum(len(p) for p in parts)} chars total")
 
     return "\n\n---\n\n".join(parts)
 
@@ -81,7 +192,7 @@ def parse_confidence(answer: str) -> tuple[str, int]:
         the operator reads. Keeping them separate makes both cleaner.
     """
     # Match "CONFIDENCE: X/5 — anything" at end of response
-    pattern = r'\nCONFIDENCE:\s*([1-5])/5[^\n]*$'
+    pattern = r'[\n\r]?\s*CONFIDENCE:\s*([1-5])/5[^\n]*$'
     match = re.search(pattern, answer.strip(), re.IGNORECASE)
 
     if match:
@@ -97,7 +208,10 @@ def teach(project_name: str, query: str,
           chat_history: list[dict] = None,
           model: str = None,
           top_k: int = None,
-          top_k_final: int = None) -> dict:
+          top_k_final: int = None,
+          chunks: list = None,
+          email_max_chars: int = None,
+          doc_max_chars: int = None) -> dict:
     """
     Answer a teaching request using retrieved document chunks.
 
@@ -106,6 +220,12 @@ def teach(project_name: str, query: str,
         query: The user's question or request
         chat_history: Optional list of prior messages for context
                       [{"role": "user"|"assistant", "content": "..."}]
+        chunks: Pre-retrieved chunks from retrieval_node. If provided
+                and non-empty, skips internal retrieval entirely.
+        email_max_chars: Character cap for email chunks passed to
+                         build_context(). If None, uses default (600).
+        doc_max_chars: Character cap for document chunks passed to
+                       build_context(). If None, uses default (600).
 
     Returns:
         {
@@ -116,10 +236,11 @@ def teach(project_name: str, query: str,
             "intent": "teach"
         }
     """
-    # Step 1: Retrieve relevant chunks via hybrid search
-    raw_results = hybrid_search(project_name, query,
-                                top_k=top_k or RETRIEVAL["top_k"])
-    chunks = rerank(raw_results, top_k_final=top_k_final or RETRIEVAL["top_k_final"])
+    # Step 1: Use pre-retrieved chunks if provided, else retrieve now
+    if not chunks:
+        raw_results = hybrid_search(project_name, query,
+                                    top_k=top_k or RETRIEVAL["top_k"])
+        chunks = rerank(raw_results, top_k_final=top_k_final or RETRIEVAL["top_k_final"])
 
     if not chunks:
         return {
@@ -132,8 +253,15 @@ def teach(project_name: str, query: str,
             "intent": "teach"
         }
 
-    # Step 2: Build context block from retrieved chunks
-    context = build_context(chunks)
+    # Step 2: Build context block from retrieved chunks, passing through
+    # the UI-supplied chunk caps (or falling back to build_context defaults)
+    build_kwargs = {}
+    if email_max_chars is not None:
+        build_kwargs["email_max_chars"] = email_max_chars
+    if doc_max_chars is not None:
+        build_kwargs["doc_max_chars"] = doc_max_chars
+
+    context = build_context(chunks, **build_kwargs)
 
     # Step 3: Build a single prompt string
     history_text = ""
@@ -164,7 +292,7 @@ explanation with citations. End with your CONFIDENCE rating."""
                 "stream": False,
                 "options": {
                     "temperature": 0.1,
-                    "num_predict": 2500,
+                    "num_predict": 3000,
                     "num_ctx": 8192,
                 }
             },

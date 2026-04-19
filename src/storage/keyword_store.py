@@ -45,7 +45,13 @@ def load_index(project_name: str):
     return bm25, chunks
 
 
-def keyword_search(project_name: str, query: str, top_k: int = 10) -> list[dict]:
+def keyword_search(project_name: str, query: str, top_k: int = 10,
+                   method_filter: list = None) -> list[dict]:
+    """
+    Search BM25 index for chunks matching the query.
+    method_filter: optional list of method values to restrict results.
+    Example: ['email'] or ['digital', 'ocr'] or None for all.
+    """
     bm25, chunks = load_index(project_name)
     if bm25 is None or not chunks:
         return []
@@ -55,12 +61,14 @@ def keyword_search(project_name: str, query: str, top_k: int = 10) -> list[dict]
         range(len(scores)),
         key=lambda i: scores[i],
         reverse=True
-    )[:top_k]
+    )[:top_k * 3 if method_filter else top_k]
     results = []
     max_score = max(scores) if max(scores) > 0 else 1
     for idx in top_indices:
         if scores[idx] > 0:
             chunk = chunks[idx]
+            if method_filter and chunk.get("method") not in method_filter:
+                continue
             results.append({
                 "chunk_id": chunk["chunk_id"],
                 "text": chunk["text"],
@@ -68,4 +76,6 @@ def keyword_search(project_name: str, query: str, top_k: int = 10) -> list[dict]
                 "page": chunk["page"],
                 "score": float(scores[idx] / max_score)
             })
+            if len(results) >= top_k:
+                break
     return results

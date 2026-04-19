@@ -423,6 +423,19 @@
     <input type="number" id="top-k-final-input" min="1" max="50" value="10" style="width:60px">
   </div>
   <div class="bar-group">
+    <span class="bar-label">Email chunk cap</span>
+    <input type="number" id="email-max-chars-input" min="100" max="2000" value="600" style="width:70px">
+  </div>
+  <div class="bar-group">
+    <span class="bar-label">Doc chunk cap</span>
+    <input type="number" id="doc-max-chars-input" min="100" max="2000" value="600" style="width:70px">
+  </div>
+  <div class="bar-group">
+    <span class="bar-label">Hybrid weight: <span id="hybrid-weight-label">50% sem / 50% kw</span></span>
+    <input type="range" id="hybrid-weight-input" min="0" max="100" value="50" step="5" style="width:120px"
+      oninput="updateHybridLabel(this.value)">
+  </div>
+  <div class="bar-group">
     <label id="upload-label">⬆ Upload Files
       <input type="file" id="upload-input" multiple>
     </label>
@@ -494,6 +507,25 @@ function getTopKFinal() {
     return null;
   }
   return val;
+}
+function getEmailMaxChars() {
+  const val = parseInt(document.getElementById('email-max-chars-input').value);
+  if (isNaN(val) || val < 100) return 600;
+  return val;
+}
+function getDocMaxChars() {
+  const val = parseInt(document.getElementById('doc-max-chars-input').value);
+  if (isNaN(val) || val < 100) return 600;
+  return val;
+}
+function getHybridWeight() {
+  const val = parseInt(document.getElementById('hybrid-weight-input').value);
+  return val / 100.0;
+}
+function updateHybridLabel(val) {
+  const sem = parseInt(val);
+  const kw = 100 - sem;
+  document.getElementById('hybrid-weight-label').textContent = sem + '% sem / ' + kw + '% kw';
 }
 function loadSessionIds() {
   try { return JSON.parse(localStorage.getItem('sessionIds') || '{}'); } catch { return {}; }
@@ -735,7 +767,10 @@ async function sendQuery() {
         router_model: document.getElementById('router-model-select').value || null,
         reasoning_model: document.getElementById('reasoning-model-select').value || null,
         top_k: getTopK(),
-        top_k_final: getTopKFinal()
+        top_k_final: getTopKFinal(),
+        hybrid_weight: getHybridWeight(),
+        email_max_chars: getEmailMaxChars(),
+        doc_max_chars: getDocMaxChars()
       })
     });
 

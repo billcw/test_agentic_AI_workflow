@@ -60,6 +60,9 @@ class QueryRequest(BaseModel):
     reasoning_model: Optional[str] = None
     top_k: Optional[int] = None
     top_k_final: Optional[int] = None
+    hybrid_weight: Optional[float] = None
+    email_max_chars: Optional[int] = None
+    doc_max_chars: Optional[int] = None
 
 
 class QueryResponse(BaseModel):
@@ -149,7 +152,10 @@ def query(request: QueryRequest):
         router_model=request.router_model,
         reasoning_model=request.reasoning_model,
         top_k=request.top_k,
-        top_k_final=request.top_k_final
+        top_k_final=request.top_k_final,
+        hybrid_weight=request.hybrid_weight,
+        email_max_chars=request.email_max_chars,
+        doc_max_chars=request.doc_max_chars
     )
 
     save_turn(
