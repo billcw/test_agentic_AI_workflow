@@ -106,6 +106,19 @@
     min-width: 120px;
   }
 
+  #btn-toggle-organizer {
+    background: #2a1f0a;
+    border-color: #6b4c10;
+    color: #f7c07e;
+  }
+
+  #btn-toggle-organizer:hover { background: #3a2a0e; }
+  #btn-toggle-organizer.active {
+    background: #3a2a0e;
+    border-color: #c07e20;
+    color: #ffd580;
+  }
+
   /* --- Folder ingest bar --- */
   #folder-bar {
     background: #13181f;
@@ -166,6 +179,151 @@
     color: #6b7280;
     min-width: 160px;
   }
+
+  /* --- File Organizer Bar --- */
+  #organizer-bar {
+    background: #12110a;
+    border-bottom: 1px solid #3a2f10;
+    padding: 10px 16px;
+    display: none;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  #organizer-bar.visible { display: flex; }
+
+  #organizer-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  #organizer-bar .bar-label {
+    color: #a08040;
+  }
+
+  .org-path-input {
+    flex: 1;
+    min-width: 260px;
+    max-width: 520px;
+    background: #1e1c10;
+    color: #ececec;
+    border: 1px solid #3a2f10;
+    border-radius: 6px;
+    padding: 5px 10px;
+    font-size: 12px;
+    font-family: 'Courier New', monospace;
+    outline: none;
+  }
+
+  .org-path-input:focus { border-color: #c07e20; }
+  .org-path-input::placeholder { color: #5a4a20; }
+
+  .org-radio-group {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 12px;
+    color: #a08040;
+  }
+
+  .org-radio-group label {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+  }
+
+
+
+  #btn-classify {
+    background: #2a1f0a;
+    border-color: #6b4c10;
+    color: #f7c07e;
+    padding: 5px 14px;
+  }
+
+  #btn-classify:hover { background: #3a2a0e; }
+  #btn-classify:disabled { background: #1e1c10; color: #4f4a30; cursor: not-allowed; }
+
+  #btn-execute-plan {
+    background: #1a3a1a;
+    border-color: #2d6e2d;
+    color: #7ef7b0;
+    padding: 5px 14px;
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s;
+  }
+
+  #btn-execute-plan.ready {
+    visibility: visible;
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  #btn-execute-plan:hover { background: #1e4a1e; }
+  #btn-execute-plan:disabled { background: #1e1c10; color: #4f4a30; cursor: not-allowed; }
+
+  #org-status {
+    font-size: 11px;
+    color: #a08040;
+    min-width: 180px;
+  }
+
+  /* Organizer results table */
+  #organizer-results {
+    display: none;
+    max-height: 260px;
+    overflow-y: auto;
+    border: 1px solid #3a2f10;
+    border-radius: 6px;
+    background: #0e0d08;
+  }
+
+  #organizer-results.visible { display: block; }
+
+  #organizer-results table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+  }
+
+  #organizer-results thead tr {
+    background: #1e1c10;
+    position: sticky;
+    top: 0;
+  }
+
+  #organizer-results th {
+    padding: 6px 10px;
+    text-align: left;
+    color: #a08040;
+    font-weight: 600;
+    border-bottom: 1px solid #3a2f10;
+    white-space: nowrap;
+  }
+
+  #organizer-results td {
+    padding: 5px 10px;
+    color: #c8b880;
+    border-bottom: 1px solid #1e1c10;
+    font-family: 'Courier New', monospace;
+    word-break: break-all;
+  }
+
+  #organizer-results tr:last-child td { border-bottom: none; }
+
+  #organizer-results td.cat-cell {
+    color: #ffd580;
+    font-family: inherit;
+    font-weight: 600;
+    word-break: normal;
+  }
+
+  #organizer-results .error-row td { color: #f77e7e; }
 
   /* --- Chat Area --- */
   #chat-area {
@@ -441,6 +599,9 @@
     </label>
     <span id="upload-status"></span>
   </div>
+  <div class="bar-group">
+    <button id="btn-toggle-organizer">🗂 File Organizer</button>
+  </div>
 </div>
 
 <!-- Folder Ingest Bar -->
@@ -453,6 +614,31 @@
   </label>
   <button id="btn-ingest-folder">Ingest Folder</button>
   <span id="folder-status"></span>
+</div>
+
+<!-- File Organizer Bar -->
+<div id="organizer-bar">
+  <div id="organizer-controls">
+    <span class="bar-label">🗂 Organize folder</span>
+    <input type="text" id="org-folder-path" class="org-path-input"
+           placeholder="/absolute/path/to/folder  (outside project directory)">
+
+    <button id="btn-classify">Classify Files</button>
+    <button id="btn-execute-plan">✓ Confirm &amp; Move Files</button>
+    <span id="org-status"></span>
+  </div>
+  <div id="organizer-results">
+    <table>
+      <thead>
+        <tr>
+          <th>Filename</th>
+          <th>Category</th>
+          <th>Destination</th>
+        </tr>
+      </thead>
+      <tbody id="organizer-results-body"></tbody>
+    </table>
+  </div>
 </div>
 
 <!-- Chat Area -->
@@ -481,6 +667,7 @@
 // --- State ---
 let currentProject = null;
 let sessionIds = {};
+let currentOrgPlan = null;   // holds the last plan returned by /organize_folder
 
 function loadPref(key, fallback) {
   try { return localStorage.getItem(key) || fallback; } catch { return fallback; }
@@ -889,6 +1076,173 @@ document.getElementById('btn-ingest-folder').addEventListener('click', async fun
 
   this.disabled = false;
 });
+
+// --- File Organizer toggle ---
+document.getElementById('btn-toggle-organizer').addEventListener('click', function() {
+  const bar = document.getElementById('organizer-bar');
+  bar.classList.toggle('visible');
+  this.classList.toggle('active');
+});
+
+
+function resetOrganizerResults() {
+  currentOrgPlan = null;
+  document.getElementById('organizer-results').classList.remove('visible');
+  document.getElementById('organizer-results-body').innerHTML = '';
+  document.getElementById('btn-execute-plan').classList.remove('ready');
+  document.getElementById('org-status').textContent = '';
+  document.getElementById('org-status').style.color = '#a08040';
+}
+
+// --- Classify Files (dry-run) ---
+document.getElementById('btn-classify').addEventListener('click', async function() {
+  const folderPath = document.getElementById('org-folder-path').value.trim();
+  const status = document.getElementById('org-status');
+
+  if (!folderPath) {
+    status.textContent = 'Enter a folder path first.';
+    status.style.color = '#f77e7e';
+    return;
+  }
+
+
+
+  resetOrganizerResults();
+  this.disabled = true;
+  status.textContent = 'Classifying files… this may take a while for large folders.';
+  status.style.color = '#a08040';
+
+  try {
+    const res = await fetch('/organize_folder', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        folder_path: folderPath,
+      })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      status.textContent = `✗ ${data.detail || 'Error'}`;
+      status.style.color = '#f77e7e';
+      this.disabled = false;
+      return;
+    }
+
+    if (data.total_files === 0) {
+      status.textContent = 'No files found in that folder.';
+      status.style.color = '#f7c07e';
+      this.disabled = false;
+      return;
+    }
+
+    // Store the plan for later execution
+    currentOrgPlan = data;
+
+    // Populate the results table
+    const tbody = document.getElementById('organizer-results-body');
+    tbody.innerHTML = '';
+
+    for (const move of (data.moves || [])) {
+      const tr = document.createElement('tr');
+      tr.innerHTML =
+        `<td>${escapeHtml(move.filename)}</td>` +
+        `<td class="cat-cell">${escapeHtml(move.category)}</td>` +
+        `<td>${escapeHtml(move.destination)}</td>`;
+      tbody.appendChild(tr);
+    }
+
+    for (const err of (data.errors || [])) {
+      const tr = document.createElement('tr');
+      tr.className = 'error-row';
+      tr.innerHTML =
+        `<td>${escapeHtml(err.filename)}</td>` +
+        `<td class="cat-cell">ERROR</td>` +
+        `<td>${escapeHtml(err.error)}</td>`;
+      tbody.appendChild(tr);
+    }
+
+    document.getElementById('organizer-results').classList.add('visible');
+
+    const errCount = (data.errors || []).length;
+    const moveCount = (data.moves || []).length;
+    status.textContent =
+      `${moveCount} file${moveCount !== 1 ? 's' : ''} classified into ` +
+      `${(data.categories || []).length} categories` +
+      (errCount > 0 ? `, ${errCount} error${errCount !== 1 ? 's' : ''}` : '') +
+      ` — review above, then confirm.`;
+    status.style.color = errCount > 0 ? '#f7c07e' : '#f7c07e';
+
+    // Show the confirm button only if there are moves to make
+    if (moveCount > 0) {
+      document.getElementById('btn-execute-plan').classList.add('ready');
+    }
+
+  } catch(e) {
+    status.textContent = `✗ ${e.message}`;
+    status.style.color = '#f77e7e';
+  }
+
+  this.disabled = false;
+});
+
+// --- Execute confirmed plan ---
+document.getElementById('btn-execute-plan').addEventListener('click', async function() {
+  if (!currentOrgPlan) return;
+
+  const moveCount = (currentOrgPlan.moves || []).length;
+  const confirmed = confirm(
+    `This will move ${moveCount} file${moveCount !== 1 ? 's' : ''} into subfolders.\n\n` +
+    `This cannot be undone automatically.\n\nProceed?`
+  );
+  if (!confirmed) return;
+
+  const status = document.getElementById('org-status');
+  this.disabled = true;
+  status.textContent = 'Moving files…';
+  status.style.color = '#a08040';
+
+  try {
+    const res = await fetch('/organize_folder/execute', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ plan: currentOrgPlan })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      status.textContent = `✗ ${data.detail || 'Error during execution'}`;
+      status.style.color = '#f77e7e';
+      this.disabled = false;
+      return;
+    }
+
+    const parts = [`✓ ${data.moved} moved`];
+    if (data.skipped > 0) parts.push(`${data.skipped} skipped`);
+    if ((data.errors || []).length > 0) parts.push(`${data.errors.length} errors`);
+    status.textContent = parts.join(', ');
+    status.style.color = (data.errors || []).length > 0 ? '#f7c07e' : '#7ef7b0';
+
+    // Clear the plan — it has been executed
+    currentOrgPlan = null;
+    this.classList.remove('ready');
+
+  } catch(e) {
+    status.textContent = `✗ ${e.message}`;
+    status.style.color = '#f77e7e';
+    this.disabled = false;
+  }
+});
+
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
 
 // --- New project modal ---
 document.getElementById('btn-new-project').addEventListener('click', () => {

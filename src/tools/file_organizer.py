@@ -1,0 +1,367 @@
+"""
+src/tools/file_organizer.py - Two-pass AI-driven file organizer.
+
+Pass 1 (broad): Classify files into broad topic categories.
+Pass 2 (fine):  Classify files within one category into sub-topics.
+
+Both passes use the same classify_files() function — only the prompt
+changes (broad vs. specific granularity).
+
+SAFETY RULES (non-negotiable):
+  - Will REFUSE any path inside the project directory.
+  - dry_run=True (default) returns a proposed plan — no files are moved.
+  - Files only move when execute_plan() is called with a confirmed plan.
+
+Why gemma4:e4b for classification?
+  Each file requires its own LLM call. The e4b model is fast and cheap
+  per call — using the 31b model here would be extremely slow for large
+  directories. Classification is a simple task; e4b is well-suited to it.
+"""
+
+import re
+import shutil
+import requests
+from pathlib import Path
+from typing import Optional
+
+from src.config import OLLAMA, MODELS
+
+# ── Project directory protection ─────────────────────────────────────────────
+
+PROJECT_ROOT = Path("/home/bill/local-ai-doc-assistant").resolve()
+
+PROTECTED_PATHS = [
+    PROJECT_ROOT,
+]
+
+
+def _assert_safe_path(path: Path) -> None:
+    """
+    Raise ValueError if the path is inside (or equal to) any protected
+    directory.
+
+    Why: The file organizer moves files. If it were ever pointed at the
+    project directory itself, it could destroy source code, config, or
+    the vector database. This check is the last line of defense.
+    """
+    resolved = path.resolve()
+    for protected in PROTECTED_PATHS:
+        try:
+            resolved.relative_to(protected)
+            raise ValueError(
+                f"REFUSED: '{resolved}' is inside the protected project "
+                f"directory '{protected}'. The file organizer cannot operate "
+                f"on the project directory or any of its subdirectories."
+            )
+        except ValueError as e:
+            if "REFUSED" in str(e):
+                raise
+            continue
+
+
+# ── File content extraction ───────────────────────────────────────────────────
+
+def _extract_text(file_path: Path, max_chars: int = 2000) -> Optional[str]:
+    """
+    Extract a text preview from a file using the project's existing readers.
+
+    Returns None if the file type is not supported or the reader fails —
+    the caller will then classify by filename only.
+
+    Why max_chars=2000?
+      We only need enough content to classify the file. 2000 characters
+      (roughly one page) is sufficient for reliable classification without
+      making every LLM call slow.
+    """
+    suffix = file_path.suffix.lower()
+
+    try:
+        # Plain text variants — read directly
+        if suffix in (".txt", ".md", ".csv", ".log", ".py", ".js", ".html"):
+            text = file_path.read_text(errors="replace")
+            return text[:max_chars]
+
+        # PDF
+        if suffix == ".pdf":
+            from src.ingestion.pdf_reader import read_pdf
+            chunks = read_pdf(str(file_path))
+            combined = " ".join(c.get("text", "") for c in chunks)
+            return combined[:max_chars]
+
+        # Word documents
+        if suffix in (".docx", ".doc"):
+            from src.ingestion.docx_reader import read_docx
+            chunks = read_docx(str(file_path))
+            combined = " ".join(c.get("text", "") for c in chunks)
+            return combined[:max_chars]
+
+        # Email files — read_email handles both .eml and .msg internally
+        if suffix in (".msg", ".eml"):
+            from src.ingestion.email_reader import read_email
+            chunks = read_email(str(file_path))
+            combined = " ".join(c.get("text", "") for c in chunks)
+            return combined[:max_chars]
+
+        # Excel
+        if suffix in (".xlsx", ".xls", ".xlsm"):
+            from src.ingestion.excel_reader import read_excel
+            chunks = read_excel(str(file_path))
+            combined = " ".join(c.get("text", "") for c in chunks)
+            return combined[:max_chars]
+
+        # Unknown type — fall through to filename-only classification
+        return None
+
+    except Exception:
+        # If any reader fails, fall through to filename-only classification.
+        # We don't want a single unreadable file to abort the whole batch.
+        return None
+
+
+# ── LLM classification ────────────────────────────────────────────────────────
+
+def _classify_file(
+    filename: str,
+    content_preview: Optional[str],
+    existing_categories: list[str],
+) -> str:
+    """
+    Ask gemma4:e4b to assign a category to one file.
+
+    When content is available, the prompt leads with content and treats
+    the filename as secondary context. This prevents the model from
+    anchoring on uninformative filenames like 'misc.pdf' or 'doc1.docx'.
+
+    Returns a plain string category name (e.g. "CIP Compliance").
+    """
+    base_url = OLLAMA.get("base_url", "http://localhost:11434")
+    model = MODELS.get("router_llm", "gemma4:e4b")
+    timeout = OLLAMA.get("timeout_seconds", 3600)
+
+    # Build the existing categories hint
+    if existing_categories:
+        cats_block = (
+            "Categories already created:\n"
+            + "\n".join(f"  - {c}" for c in existing_categories)
+            + "\n\nReuse one of these if the file fits. "
+              "Only create a new category if none apply.\n\n"
+        )
+    else:
+        cats_block = "No categories yet — you will create the first one.\n\n"
+
+    # Lead with content when available — filename is secondary
+    has_content = bool(content_preview and content_preview.strip())
+
+    if has_content:
+        content_block = (
+            f"File content (first ~2000 characters):\n"
+            f"{content_preview.strip()[:1500]}\n\n"
+            f"Filename (for additional context only): {filename}\n\n"
+        )
+    else:
+        content_block = (
+            f"Filename: {filename}\n"
+            f"(File content could not be read — classify by filename only)\n\n"
+        )
+
+    task = (
+        "You are classifying files for folder organization. "
+        "Read the file content carefully and assign a SHORT, DESCRIPTIVE "
+        "category name (2-5 words, title case, no punctuation). "
+        "The category will become a folder name. "
+        "Base your decision primarily on what the content is ABOUT, "
+        "not on the filename.\n\n"
+    )
+
+    prompt = (
+        f"{task}"
+        f"{cats_block}"
+        f"{content_block}"
+        "Respond with ONLY the category name. "
+        "No explanation. No punctuation. No quotes. Just the category name."
+    )
+
+    try:
+        response = requests.post(
+            f"{base_url}/api/generate",
+            json={
+                "model": model,
+                "prompt": prompt,
+                "stream": False,
+                "options": {
+                    "temperature": 0.0,
+                    "num_predict": 20,
+                }
+            },
+            timeout=timeout
+        )
+        response.raise_for_status()
+        raw = response.json().get("response", "").strip()
+
+        # Clean up: strip quotes, newlines, extra whitespace
+        category = re.sub(r'["\'\n\r]', '', raw).strip()
+
+        # Sanity check
+        if not category or len(category) > 60 or category.count(' ') > 6:
+            return "Uncategorized"
+
+        return category
+
+    except Exception:
+        return "Uncategorized"
+
+
+# ── Main classification pass ──────────────────────────────────────────────────
+
+def classify_files(
+    folder_path: str,
+) -> dict:
+    """
+    Scan a directory and classify every file using the LLM.
+
+    Returns a plan dict:
+    {
+        "folder": "/abs/path/to/folder",
+        "granularity": "broad" | "fine",
+        "broad_category": "...",
+        "moves": [
+            {
+                "filename": "RTU_maintenance_guide.pdf",
+                "source": "/abs/path/RTU_maintenance_guide.pdf",
+                "category": "RTU Maintenance",
+                "destination": "/abs/path/RTU Maintenance/RTU_maintenance_guide.pdf"
+            },
+            ...
+        ],
+        "categories": ["RTU Maintenance", "CIP Compliance", ...],
+        "total_files": 47,
+        "errors": [{"filename": "...", "error": "..."}]
+    }
+
+    This function NEVER moves files. It only builds the plan.
+    Call execute_plan() to actually move files after user confirmation.
+    """
+    folder = Path(folder_path)
+
+    _assert_safe_path(folder)
+
+    if not folder.exists():
+        raise FileNotFoundError(f"Folder not found: {folder_path}")
+    if not folder.is_dir():
+        raise NotADirectoryError(f"Path is not a directory: {folder_path}")
+
+    # Non-recursive — top level only.
+    # Why: the organizer creates subfolders. Recursing into its own output
+    # on a re-run would double-classify. Users point it at subfolders
+    # explicitly for Pass 2.
+    files = [f for f in folder.iterdir() if f.is_file()]
+
+    if not files:
+        return {
+            "folder": str(folder),
+            "moves": [],
+            "categories": [],
+            "total_files": 0,
+            "errors": []
+        }
+
+    moves = []
+    errors = []
+    existing_categories: list[str] = []
+
+    for file_path in sorted(files):
+        try:
+            content_preview = _extract_text(file_path)
+            category = _classify_file(
+                filename=file_path.name,
+                content_preview=content_preview,
+                existing_categories=existing_categories,
+            )
+
+            if category not in existing_categories:
+                existing_categories.append(category)
+
+            destination = folder / category / file_path.name
+
+            moves.append({
+                "filename": file_path.name,
+                "source": str(file_path),
+                "category": category,
+                "destination": str(destination),
+            })
+
+        except Exception as e:
+            errors.append({
+                "filename": file_path.name,
+                "error": str(e)
+            })
+
+    return {
+        "folder": str(folder),
+        "moves": moves,
+        "categories": sorted(existing_categories),
+        "total_files": len(files),
+        "errors": errors
+    }
+
+
+# ── Plan execution ────────────────────────────────────────────────────────────
+
+def execute_plan(plan: dict) -> dict:
+    """
+    Execute a confirmed move plan returned by classify_files().
+
+    Creates category subdirectories and moves files into them.
+    Skips files that have already been moved (source no longer exists).
+    Renames on collision (appends _1, _2, etc.) to prevent overwrites.
+
+    Returns:
+    {
+        "moved": 42,
+        "skipped": 2,
+        "errors": [{"filename": "...", "error": "..."}]
+    }
+    """
+    folder = Path(plan["folder"])
+
+    # Re-run safety check — always
+    _assert_safe_path(folder)
+
+    moved = 0
+    skipped = 0
+    errors = []
+
+    for move in plan.get("moves", []):
+        source = Path(move["source"])
+        destination = Path(move["destination"])
+
+        if not source.exists():
+            skipped += 1
+            continue
+
+        try:
+            destination.parent.mkdir(parents=True, exist_ok=True)
+
+            # Avoid silent overwrites — rename on collision
+            final_dest = destination
+            counter = 1
+            while final_dest.exists():
+                stem = destination.stem
+                suffix = destination.suffix
+                final_dest = destination.parent / f"{stem}_{counter}{suffix}"
+                counter += 1
+
+            shutil.move(str(source), str(final_dest))
+            moved += 1
+
+        except Exception as e:
+            errors.append({
+                "filename": move["filename"],
+                "error": str(e)
+            })
+
+    return {
+        "moved": moved,
+        "skipped": skipped,
+        "errors": errors
+    }

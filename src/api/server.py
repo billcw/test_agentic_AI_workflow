@@ -27,6 +27,7 @@ from src.projects.manager import (
     list_projects, create_project,
     project_exists, delete_project
 )
+from src.tools.file_organizer import classify_files, execute_plan
 
 
 # --- App Setup ---
@@ -82,6 +83,14 @@ class IngestFolderRequest(BaseModel):
     project_name: str
     folder_path: str
     force: bool = False
+
+
+class OrganizeFolderRequest(BaseModel):
+    folder_path: str
+
+
+class ExecutePlanRequest(BaseModel):
+    plan: dict
 
 
 # --- Serve Web UI ---
@@ -260,6 +269,65 @@ def ingest_folder(request: IngestFolderRequest):
         "total": result["total"],
         "results": result["results"]
     }
+
+
+# --- File Organizer Endpoints ---
+
+@app.post("/organize_folder")
+def organize_folder(request: OrganizeFolderRequest):
+    """
+    Scan a folder and return a proposed classification plan (dry-run).
+
+    Uses gemma4:e4b to classify each file into a category. Categories
+    are generated on the fly — no hardcoded list.
+
+    This endpoint NEVER moves files. It only returns the proposed plan.
+    The UI shows the plan to the user, who must confirm before execution.
+
+
+    """
+
+
+    try:
+        plan = classify_files(
+            folder_path=request.folder_path,
+        )
+        return plan
+
+    except (FileNotFoundError, NotADirectoryError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    except ValueError as e:
+        # Safety refusal — path inside project directory
+        raise HTTPException(status_code=403, detail=str(e))
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/organize_folder/execute")
+def organize_folder_execute(request: ExecutePlanRequest):
+    """
+    Execute a confirmed file organization plan.
+
+    The plan must be the exact dict returned by POST /organize_folder.
+    The UI sends it back here only after the user has reviewed and
+    confirmed the proposed moves.
+
+    Creates category subfolders and moves files into them.
+    Skips files that no longer exist at their source path.
+    Renames on collision (appends _1, _2, etc.) to prevent overwrites.
+    """
+    try:
+        result = execute_plan(request.plan)
+        return result
+
+    except ValueError as e:
+        # Safety refusal
+        raise HTTPException(status_code=403, detail=str(e))
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # --- Project Management Endpoints ---
