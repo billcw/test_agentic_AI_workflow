@@ -199,6 +199,7 @@ def _classify_file(
     filename: str,
     content_preview: Optional[str],
     existing_categories: list[str],
+    custom_instructions: Optional[str] = None,
 ) -> str:
     """
     Ask gemma4:e4b to assign a category to one file.
@@ -206,6 +207,10 @@ def _classify_file(
     When content is available, the prompt leads with content and treats
     the filename as secondary context. This prevents the model from
     anchoring on uninformative filenames like 'misc.pdf' or 'doc1.docx'.
+
+    custom_instructions: optional free-text guidance injected into the
+    prompt before the classification task. Example:
+      "prefer these categories: SCADA, CIP, Operations"
 
     Returns a plain string category name (e.g. "CIP Compliance").
     """
@@ -223,6 +228,16 @@ def _classify_file(
         )
     else:
         cats_block = "No categories yet — you will create the first one.\n\n"
+
+    # Build optional custom instructions block
+    if custom_instructions and custom_instructions.strip():
+        instructions_block = (
+            "Additional instructions from the user:\n"
+            + custom_instructions.strip()
+            + "\n\n"
+        )
+    else:
+        instructions_block = ""
 
     # Lead with content when available — filename is secondary
     has_content = bool(content_preview and content_preview.strip())
@@ -250,6 +265,7 @@ def _classify_file(
 
     prompt = (
         f"{task}"
+        f"{instructions_block}"
         f"{cats_block}"
         f"{content_block}"
         "Respond with ONLY the category name. "
@@ -290,15 +306,18 @@ def _classify_file(
 
 def classify_files(
     folder_path: str,
+    custom_instructions: Optional[str] = None,
 ) -> dict:
     """
     Scan a directory and classify every file using the LLM.
 
+    custom_instructions: optional free-text guidance passed through to
+    every _classify_file() call. Example:
+      "prefer these categories: SCADA, CIP, Operations"
+
     Returns a plan dict:
     {
         "folder": "/abs/path/to/folder",
-        "granularity": "broad" | "fine",
-        "broad_category": "...",
         "moves": [
             {
                 "filename": "RTU_maintenance_guide.pdf",
@@ -351,6 +370,7 @@ def classify_files(
                 filename=file_path.name,
                 content_preview=content_preview,
                 existing_categories=existing_categories,
+                custom_instructions=custom_instructions,
             )
 
             if category not in existing_categories:

@@ -87,6 +87,7 @@ class IngestFolderRequest(BaseModel):
 
 class OrganizeFolderRequest(BaseModel):
     folder_path: str
+    custom_instructions: str = ""
 
 
 class ExecutePlanRequest(BaseModel):
@@ -291,6 +292,7 @@ def organize_folder(request: OrganizeFolderRequest):
     try:
         plan = classify_files(
             folder_path=request.folder_path,
+            custom_instructions=request.custom_instructions or None,
         )
         return plan
 
