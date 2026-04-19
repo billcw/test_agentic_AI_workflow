@@ -47,6 +47,8 @@ class AgentState(TypedDict):
     critic_feedback: str
     refinement_attempted: bool
     scope: str
+    email_max_chars: int
+    doc_max_chars: int
 
 
 # --- Node Functions ---
@@ -92,7 +94,9 @@ def teach_node(state: AgentState) -> dict:
         model=state.get("reasoning_model"),
         top_k=state.get("top_k"),
         top_k_final=state.get("top_k_final"),
-        chunks=state.get("retrieved_chunks", [])
+        chunks=state.get("retrieved_chunks", []),
+        email_max_chars=state.get("email_max_chars"),
+        doc_max_chars=state.get("doc_max_chars")
     )
     return {
         "answer": result["answer"],
@@ -112,7 +116,9 @@ def troubleshoot_node(state: AgentState) -> dict:
         model=state.get("reasoning_model"),
         top_k=state.get("top_k"),
         top_k_final=state.get("top_k_final"),
-        chunks=state.get("retrieved_chunks", [])
+        chunks=state.get("retrieved_chunks", []),
+        email_max_chars=state.get("email_max_chars"),
+        doc_max_chars=state.get("doc_max_chars")
     )
     return {
         "answer": result["answer"],
@@ -132,7 +138,9 @@ def check_node(state: AgentState) -> dict:
         model=state.get("reasoning_model"),
         top_k=state.get("top_k"),
         top_k_final=state.get("top_k_final"),
-        chunks=state.get("retrieved_chunks", [])
+        chunks=state.get("retrieved_chunks", []),
+        email_max_chars=state.get("email_max_chars"),
+        doc_max_chars=state.get("doc_max_chars")
     )
     return {
         "answer": result["answer"],
@@ -152,7 +160,9 @@ def lookup_node(state: AgentState) -> dict:
         model=state.get("reasoning_model"),
         top_k=state.get("top_k"),
         top_k_final=state.get("top_k_final"),
-        chunks=state.get("retrieved_chunks", [])
+        chunks=state.get("retrieved_chunks", []),
+        email_max_chars=state.get("email_max_chars"),
+        doc_max_chars=state.get("doc_max_chars")
     )
     return {
         "answer": result["answer"],
@@ -172,7 +182,9 @@ def sentiment_node(state: AgentState) -> dict:
         model=state.get("reasoning_model"),
         top_k=state.get("top_k"),
         top_k_final=state.get("top_k_final"),
-        chunks=state.get("retrieved_chunks", [])
+        chunks=state.get("retrieved_chunks", []),
+        email_max_chars=state.get("email_max_chars"),
+        doc_max_chars=state.get("doc_max_chars")
     )
     return {
         "answer": result["answer"],
@@ -212,7 +224,9 @@ def refinement_node(state: AgentState) -> dict:
                 query=state["query"],
                 chat_history=state.get("chat_history", []),
                 model=state.get("reasoning_model"),
-                chunks=chunks
+                chunks=chunks,
+                email_max_chars=state.get("email_max_chars"),
+                doc_max_chars=state.get("doc_max_chars")
             )
         elif intent == "troubleshoot":
             result = troubleshoot(
@@ -220,7 +234,9 @@ def refinement_node(state: AgentState) -> dict:
                 query=state["query"],
                 chat_history=state.get("chat_history", []),
                 model=state.get("reasoning_model"),
-                chunks=chunks
+                chunks=chunks,
+                email_max_chars=state.get("email_max_chars"),
+                doc_max_chars=state.get("doc_max_chars")
             )
         elif intent == "check":
             result = check(
@@ -228,26 +244,29 @@ def refinement_node(state: AgentState) -> dict:
                 query=state["query"],
                 chat_history=state.get("chat_history", []),
                 model=state.get("reasoning_model"),
-                chunks=chunks
+                chunks=chunks,
+                email_max_chars=state.get("email_max_chars"),
+                doc_max_chars=state.get("doc_max_chars")
             )
-
         elif intent == "sentiment":
             result = analyze_sentiment(
                 project_name=state["project_name"],
                 query=state["query"],
                 chat_history=state.get("chat_history", []),
                 model=state.get("reasoning_model"),
-                chunks=chunks
+                chunks=chunks,
+                email_max_chars=state.get("email_max_chars"),
+                doc_max_chars=state.get("doc_max_chars")
             )
-
         else:
-
             result = teach(
                 project_name=state["project_name"],
                 query=state["query"],
                 chat_history=state.get("chat_history", []),
                 model=state.get("reasoning_model"),
-                chunks=chunks
+                chunks=chunks,
+                email_max_chars=state.get("email_max_chars"),
+                doc_max_chars=state.get("doc_max_chars")
             )
 
         retry_confidence = result.get("confidence", 3)
@@ -362,7 +381,9 @@ def run_agent(project_name: str, query: str,
               reasoning_model: str = None,
               top_k: int = None,
               top_k_final: int = None,
-              hybrid_weight: float = None) -> dict:
+              hybrid_weight: float = None,
+              email_max_chars: int = None,
+              doc_max_chars: int = None) -> dict:
     """
     Run the full agentic pipeline for a user query.
     Returns answer, intent, sources, chunks_used, confidence,
@@ -387,7 +408,9 @@ def run_agent(project_name: str, query: str,
         critic_verdict="",
         critic_feedback="",
         refinement_attempted=False,
-        scope="all"
+        scope="all",
+        email_max_chars=email_max_chars or 0,
+        doc_max_chars=doc_max_chars or 0
     )
 
     final_state = agent_graph.invoke(initial_state)

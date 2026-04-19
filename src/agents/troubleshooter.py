@@ -51,7 +51,9 @@ def troubleshoot(project_name: str, query: str,
                  model: str = None,
                  top_k: int = None,
                  top_k_final: int = None,
-                 chunks: list = None) -> dict:
+                 chunks: list = None,
+                 email_max_chars: int = None,
+                 doc_max_chars: int = None) -> dict:
     """
     Diagnose a problem using retrieved document chunks.
 
@@ -61,6 +63,10 @@ def troubleshoot(project_name: str, query: str,
         chat_history: Optional prior conversation context
         chunks: Pre-retrieved chunks from retrieval_node. If provided
                 and non-empty, skips internal retrieval entirely.
+        email_max_chars: Character cap for email chunks passed to
+                         build_context(). If None, uses default (600).
+        doc_max_chars: Character cap for document chunks passed to
+                       build_context(). If None, uses default (600).
 
     Returns:
         {
@@ -88,8 +94,14 @@ def troubleshoot(project_name: str, query: str,
             "intent": "troubleshoot"
         }
 
-    # Step 2: Build context block
-    context = build_context(chunks)
+    # Step 2: Build context block, passing through UI-supplied chunk caps
+    build_kwargs = {}
+    if email_max_chars is not None:
+        build_kwargs["email_max_chars"] = email_max_chars
+    if doc_max_chars is not None:
+        build_kwargs["doc_max_chars"] = doc_max_chars
+
+    context = build_context(chunks, **build_kwargs)
 
     # Step 3: Build prompt
     history_text = ""

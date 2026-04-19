@@ -70,9 +70,23 @@ def analyze_sentiment(project_name: str, query: str,
                       model: str = None,
                       top_k: int = None,
                       top_k_final: int = None,
-                      chunks: list = None) -> dict:
-    """Analyze sentiment and emotional tone in retrieved documents."""
+                      chunks: list = None,
+                      email_max_chars: int = None,
+                      doc_max_chars: int = None) -> dict:
+    """
+    Analyze sentiment and emotional tone in retrieved documents.
 
+    Args:
+        project_name: Which workspace to search
+        query: The user's sentiment analysis request
+        chat_history: Optional prior conversation context
+        chunks: Pre-retrieved chunks from retrieval_node. If provided
+                and non-empty, skips internal retrieval entirely.
+        email_max_chars: Character cap for email chunks passed to
+                         build_context(). If None, uses default (600).
+        doc_max_chars: Character cap for document chunks passed to
+                       build_context(). If None, uses default (600).
+    """
     if not chunks:
         raw_results = hybrid_search(project_name, query, top_k=top_k or 15)
         chunks = rerank(raw_results, top_k_final=top_k_final or 10)
@@ -86,7 +100,14 @@ def analyze_sentiment(project_name: str, query: str,
             "intent": "sentiment"
         }
 
-    context = build_context(chunks)
+    # Build context block, passing through UI-supplied chunk caps
+    build_kwargs = {}
+    if email_max_chars is not None:
+        build_kwargs["email_max_chars"] = email_max_chars
+    if doc_max_chars is not None:
+        build_kwargs["doc_max_chars"] = doc_max_chars
+
+    context = build_context(chunks, **build_kwargs)
 
     history_text = ""
     if chat_history:
@@ -118,7 +139,6 @@ def analyze_sentiment(project_name: str, query: str,
         )
         response.raise_for_status()
         raw_answer = response.json()["response"].strip()
-        print(f"  [Sentiment DEBUG] Response length: {len(raw_answer)} | Preview: {raw_answer[:200]}")
 
         if not raw_answer:
             print("  [Sentiment] LLM returned empty response, using keyword fallback")

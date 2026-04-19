@@ -53,7 +53,7 @@ CRITICAL RULES — violating these is worse than giving no answer:
    Where X reflects how completely the excerpts support your answer (not your general knowledge)."""
 
 
-def _clean_chunk_text(text: str, max_chars: int = 400) -> str:
+def _clean_chunk_text(text: str, max_chars: int = 600) -> str:
     """
     Clean a single chunk's text before feeding it to the LLM.
 
@@ -68,13 +68,13 @@ def _clean_chunk_text(text: str, max_chars: int = 400) -> str:
 
     With num_ctx=8192, feeding 10 chunks of raw noisy email text can
     overflow the context window, causing the model to loop and repeat
-    phrases endlessly. Capping at 400 chars per chunk after cleaning
+    phrases endlessly. Capping at 600 chars per chunk after cleaning
     keeps total context well within safe limits while preserving the
     meaningful content the LLM actually needs.
 
     Args:
         text: Raw chunk text from ChromaDB
-        max_chars: Maximum characters to keep after cleaning (default 400)
+        max_chars: Maximum characters to keep after cleaning (default 600)
 
     Returns:
         Cleaned, truncated text. Empty string if nothing useful remains.
@@ -123,14 +123,22 @@ def _clean_chunk_text(text: str, max_chars: int = 400) -> str:
     return text
 
 
-def build_context(chunks: list[dict]) -> str:
+def build_context(chunks: list[dict],
+                  email_max_chars: int = 600,
+                  doc_max_chars: int = 600) -> str:
     """
     Format retrieved chunks into a context block for the LLM prompt.
     Each chunk is labeled with its source so the model can cite it.
 
     Chunks are cleaned before assembly to remove URL-encoded noise
-    and capped at 400 characters each to prevent context overflow.
+    and capped at email_max_chars or doc_max_chars depending on the
+    chunk's 'method' metadata field ('email' vs 'digital'/'ocr').
     Chunks that are empty after cleaning are skipped entirely.
+
+    Args:
+        chunks: Retrieved chunk dicts from hybrid search / reranker
+        email_max_chars: Character cap for email chunks (default 600)
+        doc_max_chars: Character cap for document chunks (default 600)
     """
     if not chunks:
         return "No relevant documents found."
@@ -141,8 +149,16 @@ def build_context(chunks: list[dict]) -> str:
         source = chunk.get("source", "unknown")
         page = chunk.get("page", "?")
         text = chunk.get("text", "")
+        method = chunk.get("method", "digital")
 
-        cleaned = _clean_chunk_text(text, max_chars=400)
+        # Choose cap based on chunk type — email chunks tend to be
+        # noisier so they may warrant a different cap than clean PDFs
+        if method == "email":
+            cap = email_max_chars
+        else:
+            cap = doc_max_chars
+
+        cleaned = _clean_chunk_text(text, max_chars=cap)
 
         if not cleaned or len(cleaned) < 20:
             skipped += 1
@@ -193,7 +209,9 @@ def teach(project_name: str, query: str,
           model: str = None,
           top_k: int = None,
           top_k_final: int = None,
-          chunks: list = None) -> dict:
+          chunks: list = None,
+          email_max_chars: int = None,
+          doc_max_chars: int = None) -> dict:
     """
     Answer a teaching request using retrieved document chunks.
 
@@ -204,6 +222,10 @@ def teach(project_name: str, query: str,
                       [{"role": "user"|"assistant", "content": "..."}]
         chunks: Pre-retrieved chunks from retrieval_node. If provided
                 and non-empty, skips internal retrieval entirely.
+        email_max_chars: Character cap for email chunks passed to
+                         build_context(). If None, uses default (600).
+        doc_max_chars: Character cap for document chunks passed to
+                       build_context(). If None, uses default (600).
 
     Returns:
         {
@@ -231,8 +253,15 @@ def teach(project_name: str, query: str,
             "intent": "teach"
         }
 
-    # Step 2: Build context block from retrieved chunks
-    context = build_context(chunks)
+    # Step 2: Build context block from retrieved chunks, passing through
+    # the UI-supplied chunk caps (or falling back to build_context defaults)
+    build_kwargs = {}
+    if email_max_chars is not None:
+        build_kwargs["email_max_chars"] = email_max_chars
+    if doc_max_chars is not None:
+        build_kwargs["doc_max_chars"] = doc_max_chars
+
+    context = build_context(chunks, **build_kwargs)
 
     # Step 3: Build a single prompt string
     history_text = ""
