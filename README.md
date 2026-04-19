@@ -19,6 +19,27 @@ Everything runs on your own hardware. No subscription. No cloud. No data ever le
 
 > **Built on minimum viable hardware — intentionally.** A core goal of this project was to discover exactly how little hardware is needed to run a fully capable, production-quality agentic AI system. The reference build uses a consumer mini PC with an eGPU — not a server, not a workstation, not a cloud instance. If it runs well here, it runs anywhere.
 
+---
+
+## A Learning Project — By Design
+
+This project was built as much to learn as to ship.
+
+The author — an experienced SCADA/EMS operations professional — came into this project with deep domain expertise in industrial control systems and zero background in AI development, Python packaging, vector databases, or agentic architectures. Every component was built from scratch, one step at a time, with a deliberate focus on understanding the *why* behind every decision — not just getting it to work.
+
+That constraint shaped everything:
+
+- **Architecture decisions were justified, not just accepted.** When a proposed approach wasn't professionally sound, it was pushed back on and a better one was found.
+- **Every technical concept was explained in plain language** before being implemented — analogies, examples, and the reasoning behind each choice are baked into the code comments throughout.
+- **Mistakes were diagnostic opportunities.** Heredoc corruption, BM25Okapi IDF failures, ChromaDB `where=None` crashes, Gemma 4 extended thinking consuming all tokens — each one was understood before it was fixed.
+- **The build was incremental and verified.** No step was built on top of an unconfirmed previous step. This produced a system where every layer is understood, not just assembled.
+
+The result is a production-quality agentic RAG system built by someone learning AI development in real time — which means the code is intentionally readable, the comments explain intent not just mechanics, and the architecture reflects considered decisions rather than cargo-culted patterns.
+
+If you are also learning — this codebase is meant to be readable by you.
+
+---
+
 ### Works for Any Domain
 
 | Domain | Domain | Domain |
@@ -33,7 +54,7 @@ Everything runs on your own hardware. No subscription. No cloud. No data ever le
 ## Key Features
 
 - 🔒 **Fully Offline & Private** — No API keys. No cloud services. Every inference runs locally on your CPU or GPU. Your documents never leave your machine.
-- 🗂️ **All Document Types** — PDF (digital + scanned OCR), Word, Excel, PST/OST email archives, plain text, Markdown, CSV, and images — all ingested automatically.
+- 🗂️ **All Document Types** — PDF (digital + scanned OCR), Word, Excel, PST/OST email archives, MSG files, plain text, Markdown, CSV, and images — all ingested automatically.
 - 🔍 **Hybrid Search** — Combines semantic vector search (ChromaDB) with BM25 keyword matching. Finds both conceptual answers and exact technical terms.
 - 🎯 **Scope-Aware Retrieval** — The router automatically detects whether a query targets emails, documents, or all sources and filters retrieval accordingly. No manual selection needed.
 - 🤖 **Five Specialist Agents** — Router, Teacher, Troubleshooter, Work Checker, and Sentiment Analyst — each optimized for a different type of question.
@@ -48,6 +69,7 @@ Everything runs on your own hardware. No subscription. No cloud. No data ever le
 - 📂 **Bulk Folder Ingestion** — Point the system at any folder on your machine and ingest hundreds of documents at once via the web UI.
 - 🎛️ **Model Switching** — UI dropdowns allow switching router and reasoning models per query without restarting the server.
 - ⚖️ **Hybrid Weight Slider** — Live UI control to adjust the semantic/keyword search balance (0-100%) per query without restarting.
+- 📏 **Chunk Cap Controls** — Separate UI controls for email and document chunk character limits, allowing live tuning of context density without a server restart.
 - 🖼️ **Vision Capability** — Submit photos or screenshots for live analysis using Gemma 4 native vision support.
 - 🌐 **Browser Interface** — A custom dark-themed web UI accessible from any browser on your local network. No command line needed for end users.
 - ⚙️ **One Config File** — Everything lives in a single `config.yaml`. Deploy on any OS or hardware by editing one file.
@@ -98,7 +120,7 @@ file    pdf/ocr  1000    nomic    Chroma   SQLite
 type    /docx    chars   -embed   +BM25    metadata
 ```
 
-1. **Detect** — Identifies file type from extension — PDF, DOCX, XLSX, PST/OST, EML, images, text
+1. **Detect** — Identifies file type from extension — PDF, DOCX, XLSX, PST/OST, EML, MSG, images, text
 2. **Read** — Extracts raw text page by page. Uses Tesseract OCR for scanned content and images
 3. **Chunk** — Splits text into 1000-character overlapping segments (200-char overlap). Filters chunks under 100 chars
 4. **Embed** — Generates semantic vectors via `nomic-embed-text` running locally through Ollama
@@ -126,7 +148,7 @@ Your Query
                     |
         Source Diversity Check -- if only 1 source, fire second pass
                     |
-           Re-ranker -> Top 10 high-quality chunks
+           Re-ranker -> Top N high-quality chunks
                     |
         Specialist Agent synthesizes answer with citations
                     |
@@ -137,60 +159,39 @@ Your Query
             Final answer delivered
 ```
 
-**Why hybrid search?** Semantic search finds conceptually similar content but may miss exact technical terms. Keyword search finds exact terms but misses conceptual questions. Together they cover both cases. The balance is tunable via the hybrid weight slider in the UI or `hybrid_weight` in `config.yaml`.
-
-**Why scope filtering?** With 69,000+ chunks across PDFs and email archives, semantic search naturally biases toward the dominant document type. A query like *show me urgent communications* would surface technical manuals instead of emails without scope filtering. The router detects the intended corpus automatically and applies a ChromaDB metadata filter and BM25 post-filter before scoring begins.
-
----
-
-## Tech Stack
-
-| Layer | Technology | Purpose |
-|-------|-----------|---------|
-| LLM (main) | Gemma 4 31B via Ollama | Teaching, troubleshooting, work checking, sentiment analysis |
-| LLM (router) | Gemma 4 E4B via Ollama | Fast intent and scope classification |
-| Embeddings | nomic-embed-text | Offline vector generation via Ollama |
-| Vector DB | ChromaDB | Semantic similarity search with metadata filtering |
-| Keyword Search | BM25Plus (rank_bm25) | Exact technical term matching — reliable on any corpus size |
-| Agent Framework | LangGraph | Agent orchestration, state management, conditional routing |
-| OCR | Tesseract + pytesseract | Scanned PDF and image text extraction |
-| PDF Reading | pymupdf | Digital PDF text extraction |
-| Word Docs | python-docx | .docx processing |
-| Email Archives | libpff-python | PST/OST archive ingestion |
-| Spreadsheets | openpyxl | .xlsx processing |
-| Metadata | SQLite | Document tracking, chunk counts, chat history |
-| UI | Custom dark-themed HTML/JS | Browser interface at localhost:8000 |
-| API | FastAPI + uvicorn | Backend connecting UI to agents |
-| Config | PyYAML | Portable single-file configuration system |
-
----
-
-## Hardware Requirements
-
-**One of the explicit goals of this project was to find the minimum hardware needed to run a fully capable agentic AI system.** The reference build is a consumer mini PC with an eGPU — deliberately chosen to prove that enterprise-grade document intelligence does not require enterprise-grade hardware. The table below shows the full capability ladder:
-
-| VRAM | Recommended Model | Notes |
-|------|------------------|-------|
-| 12GB | Gemma 4 31B (Q4) | Best quality — reference build hardware |
-| 8GB | Gemma 4 E4B | Good balance of speed and quality |
-| 6GB | Gemma 4 E2B | Edge model, still capable for most queries |
-| CPU only | Gemma 4 E2B | Functional at ~1-3 tokens/sec |
-| Apple Silicon | Gemma 4 31B via MLX | Excellent performance on M-series chips |
-
-**Reference build:** MINISFORUM UM760 mini PC (Ryzen 5 7640HS, 32GB RAM) with RTX 3060 eGPU (12GB VRAM) running Ubuntu Linux 22.04. This hardware was chosen deliberately as the minimum practical configuration for running a 31B parameter model with full GPU acceleration. Total cost at time of build: approximately $400-500 USD for the mini PC plus $300-400 for a used RTX 3060 eGPU enclosure.
-
 ---
 
 ## Quick Start
 
-### 1. Prerequisites
+### Prerequisites
 
-- [Ollama](https://ollama.com) installed and running
+- Ubuntu Linux (or any Linux/macOS — Windows untested)
 - Python 3.11+
+- [Ollama](https://ollama.ai) installed and running
+- At least 8GB VRAM (12GB recommended for 31B model)
 - Tesseract OCR: `sudo apt install tesseract-ocr`
-- For PST/OST email ingestion: `sudo apt install libpff-dev`
 
-### 2. Pull Required Models
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/billcw/test_agentic_AI_workflow.git
+cd test_agentic_AI_workflow
+```
+
+### 2. Create a Virtual Environment
+
+```bash
+python3 -m venv venv
+source venv/bin/activate
+```
+
+### 3. Install Dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### 4. Pull the Required Models
 
 ```bash
 ollama pull gemma4:31b
@@ -198,54 +199,28 @@ ollama pull gemma4:e4b
 ollama pull nomic-embed-text
 ```
 
-### 3. Clone and Configure
+### 5. Configure the System
 
 ```bash
-git clone https://github.com/billcw/test_agentic_AI_workflow.git
-cd local-ai-doc-assistant
 cp config.example.yaml config.yaml
-# Edit config.yaml with your paths and model choices
+nano config.yaml   # edit paths to match your system
 ```
 
-### 4. Set Up Python Environment
-
-```bash
-python3.11 -m venv venv
-source venv/bin/activate          # Linux/Mac
-# venv\Scripts\activate           # Windows
-
-pip install -r requirements.txt
-```
-
-### 5. Run Setup Verification
+### 6. Run the Setup Verification
 
 ```bash
 python setup.py
 ```
 
-All checks should pass before continuing.
-
-### 6. Launch the API Server
+### 7. Start the Server
 
 ```bash
 uvicorn src.api.server:app --host 0.0.0.0 --port 8000
 ```
 
-Open your browser to `http://localhost:8000`.
+### 8. Open the Web UI
 
-### 7. Create Your First Project
-
-1. Click **+ New** in the top bar
-2. Enter a project name (e.g. `my-documents`)
-3. Click **Create**
-
-### 8. Ingest Documents
-
-**Single or multiple files:** Click **⬆ Upload Files** and select one or more files.
-
-**Entire folder (recommended for bulk):** Type an absolute folder path into the **📁 Ingest folder** bar and click **Ingest Folder**. The server reads documents directly from disk — no uploading required.
-
-**PST/OST email archives:** Ingest your `.pst` or `.ost` file the same as any other document. The pipeline automatically detects and extracts all emails with metadata preserved.
+Navigate to `http://localhost:8000` in any browser. Create a project, ingest some documents, and start asking questions.
 
 See [docs/ADDING_DOCUMENTS.md](docs/ADDING_DOCUMENTS.md) for full details on all ingestion options.
 
@@ -314,6 +289,8 @@ local-ai-doc-assistant/
 | agentic-v2 | Sentiment agent — LLM-first with keyword fallback | ✅ Complete |
 | agentic-v2 | Scope-aware retrieval — email/document/all filtering | ✅ Complete |
 | agentic-v2 | Hybrid weight slider wired through full pipeline | ✅ Complete |
+| agentic-v2 | UI-controllable chunk caps — email and document | ✅ Complete |
+| agentic-v2 | MSG email file support via extract-msg | ✅ Complete |
 | agentic-v2 | Critic agent — response evaluation framework | 🔄 In Progress |
 
 ---
@@ -326,6 +303,7 @@ local-ai-doc-assistant/
 - 📣 **Always Explainable** — Every answer cites its source document and page. Contradictions are flagged, never silently resolved.
 - 🚫 **No LangChain Monolith** — LangGraph for agents, direct Ollama API calls for LLM, direct ChromaDB for vectors. No black-box abstraction layers.
 - ⏱️ **Quality Over Speed** — Timeout set to 3600 seconds. Response time is not a design constraint. Accuracy is.
+- 📖 **Readable by Design** — Code comments explain intent and reasoning, not just mechanics. Built to be understood, not just run.
 
 ---
 
