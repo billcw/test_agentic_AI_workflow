@@ -118,6 +118,7 @@ def analyze_sentiment(project_name: str, query: str,
         )
         response.raise_for_status()
         raw_answer = response.json()["response"].strip()
+        print(f"  [Sentiment DEBUG] Response length: {len(raw_answer)} | Preview: {raw_answer[:200]}")
 
         if not raw_answer:
             print("  [Sentiment] LLM returned empty response, using keyword fallback")

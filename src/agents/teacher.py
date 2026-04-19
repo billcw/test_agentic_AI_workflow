@@ -47,20 +47,111 @@ Rules you must always follow:
    Where X is 1 (very uncertain) to 5 (fully supported by documents)."""
 
 
+def _clean_chunk_text(text: str, max_chars: int = 400) -> str:
+    """
+    Clean a single chunk's text before feeding it to the LLM.
+
+    Why this matters:
+    PST email archives contain large amounts of content that is useless
+    to the LLM and consumes precious context window tokens:
+    - urldefense.com encoded URLs: long base64-like strings that carry
+      no semantic meaning (e.g. urldefense.com/v3/__https://u1107...)
+    - mailto: encoded link fragments scattered throughout reply chains
+    - Lines of pure alphanumeric noise (base64, encoded tokens, etc.)
+    - Excessive blank lines from email formatting
+
+    With num_ctx=8192, feeding 10 chunks of raw noisy email text can
+    overflow the context window, causing the model to loop and repeat
+    phrases endlessly. Capping at 400 chars per chunk after cleaning
+    keeps total context well within safe limits while preserving the
+    meaningful content the LLM actually needs.
+
+    Args:
+        text: Raw chunk text from ChromaDB
+        max_chars: Maximum characters to keep after cleaning (default 400)
+
+    Returns:
+        Cleaned, truncated text. Empty string if nothing useful remains.
+    """
+    if not text:
+        return ""
+
+    # Remove urldefense.com encoded URLs entirely — these are never
+    # useful to the LLM. They look like:
+    # https://urldefense.com/v3/__https://u11074663.ct.sendgrid...
+    text = re.sub(r'https?://urldefense\.com\S+', '[URL removed]', text)
+
+    # Remove mailto: encoded links — fragments like:
+    # <mailto:Victoria.Robinson@lge-ku.com>
+    text = re.sub(r'<mailto:[^>]+>', '', text)
+
+    # Remove bare mailto: references without angle brackets
+    text = re.sub(r'mailto:\S+', '', text)
+
+    # Remove lines that are pure encoded noise — lines with no spaces
+    # and longer than 40 characters are almost always base64/token garbage
+    lines = text.split('\n')
+    cleaned_lines = []
+    for line in lines:
+        stripped = line.strip()
+        # Keep the line if it has spaces (real text) or is short
+        if ' ' in stripped or len(stripped) <= 40:
+            cleaned_lines.append(line)
+        # Otherwise it's likely an encoded token — skip it
+    text = '\n'.join(cleaned_lines)
+
+    # Collapse runs of 3+ blank lines down to a single blank line
+    text = re.sub(r'\n{3,}', '\n\n', text)
+
+    # Collapse runs of whitespace within lines
+    text = re.sub(r'[ \t]{2,}', ' ', text)
+
+    # Strip leading/trailing whitespace
+    text = text.strip()
+
+    # Cap at max_chars — truncate with an ellipsis so the LLM knows
+    # the text continues beyond what it can see
+    if len(text) > max_chars:
+        text = text[:max_chars].rstrip() + "..."
+
+    return text
+
+
 def build_context(chunks: list[dict]) -> str:
     """
     Format retrieved chunks into a context block for the LLM prompt.
     Each chunk is labeled with its source so the model can cite it.
+
+    Chunks are cleaned before assembly to remove URL-encoded noise
+    and capped at 400 characters each to prevent context overflow.
+    Chunks that are empty after cleaning are skipped entirely.
     """
     if not chunks:
         return "No relevant documents found."
 
     parts = []
+    skipped = 0
     for i, chunk in enumerate(chunks, 1):
         source = chunk.get("source", "unknown")
         page = chunk.get("page", "?")
         text = chunk.get("text", "")
-        parts.append(f"[Excerpt {i} — Source: {source}, Page {page}]\n{text}")
+
+        cleaned = _clean_chunk_text(text, max_chars=400)
+
+        if not cleaned or len(cleaned) < 20:
+            skipped += 1
+            continue
+
+        parts.append(f"[Excerpt {i} — Source: {source}, Page {page}]\n{cleaned}")
+
+    if skipped > 0:
+        print(f"  [Context] Skipped {skipped} empty/noise chunks after cleaning")
+
+    if not parts:
+        return "No usable document content found after filtering noise."
+
+    print(f"  [Context] Built context from {len(parts)} chunks, "
+          f"~{sum(len(p) for p in parts)} chars total")
 
     return "\n\n---\n\n".join(parts)
 

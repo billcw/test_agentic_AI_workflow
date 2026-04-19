@@ -201,7 +201,8 @@ def refinement_node(state: AgentState) -> dict:
             query=state["query"],
             top_k=state.get("top_k") or None,
             top_k_final=state.get("top_k_final") or None,
-            hybrid_weight=retry_weight
+            hybrid_weight=retry_weight,
+            scope=state.get("scope", "all")
         )
 
         intent = state["intent"]
@@ -229,7 +230,18 @@ def refinement_node(state: AgentState) -> dict:
                 model=state.get("reasoning_model"),
                 chunks=chunks
             )
+
+        elif intent == "sentiment":
+            result = analyze_sentiment(
+                project_name=state["project_name"],
+                query=state["query"],
+                chat_history=state.get("chat_history", []),
+                model=state.get("reasoning_model"),
+                chunks=chunks
+            )
+
         else:
+
             result = teach(
                 project_name=state["project_name"],
                 query=state["query"],
