@@ -467,42 +467,60 @@ def execute_plan(plan: dict) -> dict:
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"}
 
 
-def _image_matches_query(description: str, query: str) -> bool:
+def _image_matches_query(description: str, query: str, file_path: Optional[Path] = None) -> bool:
     """
-    Ask gemma4:e4b whether an image description matches a user query.
+    Determine whether an image matches a user query using a two-step approach.
 
-    Why a separate LLM call instead of string matching?
-      String matching would miss synonyms and semantic relationships.
-      "outdoor scene" should match a description mentioning "backyard" or
-      "park". The LLM handles this naturally.
+    Step 1 — String pre-check:
+      If any query word appears in the description (case-insensitive), return
+      True immediately. This is fast, requires no LLM call, and handles the
+      common case where the vision description already names the subject.
+      Example: query "dog", description "a fluffy dog on a lawn" → True.
 
-    Why e4b and not 31b?
-      This is a simple yes/no classification call — exactly what e4b is
-      designed for. Fast and cheap per call.
+    Step 2 — Direct vision check (fallback):
+      If the string pre-check fails AND file_path is provided, send the raw
+      image to gemma4:e4b with a short, focused yes/no prompt.
+      Why direct vision instead of description-based LLM matching?
+        The description-matching path requires a long prompt, which causes
+        e4b's thinking block to consume 150-250+ tokens before producing
+        output — making num_predict unpredictable. A short direct vision
+        prompt ("Does this image contain X?") keeps the thinking block small
+        and fits reliably within num_predict=50.
+      This also handles cases where the description frames the image
+      artistically and obscures the actual subject (e.g. broccoli described
+      primarily as a "whimsical arrangement with a birdhouse").
 
-    Returns True if the model says the image matches, False otherwise.
+    Returns True if either step concludes the image matches.
     """
     base_url = OLLAMA.get("base_url", "http://localhost:11434")
     model = MODELS.get("router_llm", "gemma4:e4b")
     timeout = OLLAMA.get("timeout_seconds", 3600)
 
-    prompt = (
-        f"A user is searching for images matching this description: \"{query}\"\n\n"
-        f"This image was described as: \"{description}\"\n\n"
-        "Does this image match what the user is looking for?\n"
-        "Respond with only YES or NO."
-    )
+    # Step 1: string pre-check — any query word in description?
+    query_words = [w.strip().lower() for w in query.split() if len(w.strip()) > 2]
+    description_lower = description.lower()
+    if any(word in description_lower for word in query_words):
+        return True
+
+    # Step 2: direct vision check on the raw image
+    if file_path is None or not file_path.exists():
+        return False
 
     try:
+        image_data = base64.b64encode(file_path.read_bytes()).decode("utf-8")
+
+        prompt = f"Does this image contain {query}? Respond with only YES or NO."
+
         response = requests.post(
             f"{base_url}/api/generate",
             json={
                 "model": model,
                 "prompt": prompt,
+                "images": [image_data],
                 "stream": False,
                 "options": {
                     "temperature": 0.0,
-                    "num_predict": 10,
+                    "num_predict": 50,
                 }
             },
             timeout=timeout
@@ -595,7 +613,7 @@ def filter_images(
                 continue
 
             # Step 2: ask LLM if description matches query
-            matched = _image_matches_query(description, query.strip())
+            matched = _image_matches_query(description, query.strip(), file_path)
 
             result_entry = {
                 "filename": file_path.name,
