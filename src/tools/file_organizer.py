@@ -460,3 +460,188 @@ def execute_plan(plan: dict) -> dict:
         "skipped": skipped,
         "errors": errors
     }
+
+
+# ── Image filter ──────────────────────────────────────────────────────────────
+
+IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"}
+
+
+def _image_matches_query(description: str, query: str) -> bool:
+    """
+    Ask gemma4:e4b whether an image description matches a user query.
+
+    Why a separate LLM call instead of string matching?
+      String matching would miss synonyms and semantic relationships.
+      "outdoor scene" should match a description mentioning "backyard" or
+      "park". The LLM handles this naturally.
+
+    Why e4b and not 31b?
+      This is a simple yes/no classification call — exactly what e4b is
+      designed for. Fast and cheap per call.
+
+    Returns True if the model says the image matches, False otherwise.
+    """
+    base_url = OLLAMA.get("base_url", "http://localhost:11434")
+    model = MODELS.get("router_llm", "gemma4:e4b")
+    timeout = OLLAMA.get("timeout_seconds", 3600)
+
+    prompt = (
+        f"A user is searching for images matching this description: \"{query}\"\n\n"
+        f"This image was described as: \"{description}\"\n\n"
+        "Does this image match what the user is looking for?\n"
+        "Respond with only YES or NO."
+    )
+
+    try:
+        response = requests.post(
+            f"{base_url}/api/generate",
+            json={
+                "model": model,
+                "prompt": prompt,
+                "stream": False,
+                "options": {
+                    "temperature": 0.0,
+                    "num_predict": 10,
+                }
+            },
+            timeout=timeout
+        )
+        response.raise_for_status()
+        answer = response.json().get("response", "").strip().upper()
+        return answer.startswith("YES")
+
+    except Exception:
+        return False
+
+
+def filter_images(
+    source_folder: str,
+    query: str,
+    destination_folder: str,
+) -> dict:
+    """
+    Scan a folder for images, describe each one with vision, and move
+    those that match the query to the destination folder.
+
+    This is a filter+move tool — not a classifier. It does not create
+    subfolders or build a plan for confirmation. Matches are moved
+    immediately on the assumption that the user has reviewed the query.
+
+    Why no dry-run / confirmation step here?
+      The organizer needs confirmation because it proposes a folder
+      structure the user must review. The image filter has a much simpler
+      contract: "find images matching X and put them in Y". The query
+      itself is the specification — the user knows what they asked for.
+
+    Returns:
+    {
+        "source": "/abs/path/to/source",
+        "destination": "/abs/path/to/destination",
+        "query": "dogs outdoors",
+        "total_images": 42,
+        "matched": 7,
+        "moved": 7,
+        "skipped": 0,
+        "results": [
+            {
+                "filename": "photo1.jpg",
+                "description": "a dog running in a park",
+                "matched": true,
+                "moved": true,
+                "destination": "/abs/path/to/destination/photo1.jpg"
+            },
+            ...
+        ],
+        "errors": [{"filename": "...", "error": "..."}]
+    }
+    """
+    source = Path(source_folder)
+    dest = Path(destination_folder)
+
+    _assert_safe_path(source)
+    _assert_safe_path(dest)
+
+    if not source.exists():
+        raise FileNotFoundError(f"Source folder not found: {source_folder}")
+    if not source.is_dir():
+        raise NotADirectoryError(f"Source path is not a directory: {source_folder}")
+    if not query or not query.strip():
+        raise ValueError("Query cannot be empty.")
+
+    # Collect image files only — top level
+    image_files = [
+        f for f in sorted(source.iterdir())
+        if f.is_file() and f.suffix.lower() in IMAGE_EXTENSIONS
+    ]
+
+    results = []
+    errors = []
+    matched_count = 0
+    moved_count = 0
+    skipped_count = 0
+
+    for file_path in image_files:
+        try:
+            # Step 1: describe the image using vision
+            description = _describe_image(file_path)
+
+            if not description:
+                # Vision call failed — skip this file
+                errors.append({
+                    "filename": file_path.name,
+                    "error": "Vision description failed — skipped."
+                })
+                continue
+
+            # Step 2: ask LLM if description matches query
+            matched = _image_matches_query(description, query.strip())
+
+            result_entry = {
+                "filename": file_path.name,
+                "description": description,
+                "matched": matched,
+                "moved": False,
+                "destination": None,
+            }
+
+            if matched:
+                matched_count += 1
+
+                # Step 3: move the file to destination
+                dest.mkdir(parents=True, exist_ok=True)
+                final_dest = dest / file_path.name
+
+                # Collision handling
+                counter = 1
+                while final_dest.exists():
+                    final_dest = dest / f"{file_path.stem}_{counter}{file_path.suffix}"
+                    counter += 1
+
+                if file_path.exists():
+                    shutil.move(str(file_path), str(final_dest))
+                    moved_count += 1
+                    result_entry["moved"] = True
+                    result_entry["destination"] = str(final_dest)
+                else:
+                    skipped_count += 1
+
+            results.append(result_entry)
+
+        except Exception as e:
+            errors.append({
+                "filename": file_path.name,
+                "error": str(e)
+            })
+
+    return {
+        "source": str(source),
+        "destination": str(dest),
+        "query": query.strip(),
+        "total_images": len(image_files),
+        "matched": matched_count,
+        "moved": moved_count,
+        "skipped": skipped_count,
+        "results": results,
+        "errors": errors,
+    }

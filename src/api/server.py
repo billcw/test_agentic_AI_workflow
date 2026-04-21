@@ -27,7 +27,7 @@ from src.projects.manager import (
     list_projects, create_project,
     project_exists, delete_project
 )
-from src.tools.file_organizer import classify_files, execute_plan
+from src.tools.file_organizer import classify_files, execute_plan, filter_images
 
 
 # --- App Setup ---
@@ -92,7 +92,32 @@ class OrganizeFolderRequest(BaseModel):
 
 class ExecutePlanRequest(BaseModel):
     plan: dict
+class ImageFilterRequest(BaseModel):
+    source_folder: str
+    query: str
+    destination_folder: str
 
+
+# --- Image Filter Endpoint ---
+@app.post("/filter_images")
+def filter_images_endpoint(request: ImageFilterRequest):
+    """
+    Scan a source folder for images, describe each one with vision,
+    and move those matching the query to the destination folder.
+    """
+    try:
+        result = filter_images(
+            source_folder=request.source_folder,
+            query=request.query,
+            destination_folder=request.destination_folder,
+        )
+        return result
+    except (FileNotFoundError, NotADirectoryError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # --- Serve Web UI ---
 

@@ -181,6 +181,91 @@
   }
 
   /* --- File Organizer Bar --- */
+  #btn-toggle-imgfilter {
+    background: #0e2a1a;
+    color: #7ecfa0;
+    border: 1px solid #2a6a44;
+    border-radius: 4px;
+    padding: 5px 12px;
+    cursor: pointer;
+    font-size: 0.85rem;
+  }
+  #btn-toggle-imgfilter:hover { background: #0a2a14; }
+  #btn-toggle-imgfilter.active {
+    background: #1a4a2a;
+    border-color: #4aaf74;
+  }
+  #imgfilter-bar {
+    display: none;
+    flex-direction: column;
+    padding: 10px 16px;
+    background: #0e1a14;
+    border-bottom: 1px solid #2a4a34;
+    gap: 6px;
+  }
+  #imgfilter-bar.visible { display: flex; }
+  #imgfilter-controls {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .imgfilter-path-input {
+    background: #1a2a1e;
+    color: #e0d6c2;
+    border: 1px solid #2a4a34;
+    border-radius: 4px;
+    padding: 5px 8px;
+    font-size: 0.85rem;
+    width: 280px;
+  }
+  .imgfilter-query-input {
+    background: #1a2a1e;
+    color: #e0d6c2;
+    border: 1px solid #2a4a34;
+    border-radius: 4px;
+    padding: 5px 8px;
+    font-size: 0.85rem;
+    width: 220px;
+  }
+  #btn-run-imgfilter {
+    background: #1a4a2a;
+    color: #7ecfa0;
+    border: 1px solid #2a6a44;
+    border-radius: 4px;
+    padding: 5px 14px;
+    cursor: pointer;
+    font-size: 0.85rem;
+  }
+  #btn-run-imgfilter:hover { background: #0a3a1a; }
+  #imgfilter-results {
+    display: none;
+    margin-top: 8px;
+    overflow-x: auto;
+  }
+  #imgfilter-results.visible { display: block; }
+  #imgfilter-results table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+  }
+  #imgfilter-results thead tr { background: #0a2a14; }
+  #imgfilter-results th {
+    text-align: left;
+    padding: 6px 10px;
+    color: #7ecfa0;
+    border-bottom: 1px solid #2a4a34;
+    font-weight: 600;
+  }
+  #imgfilter-results td {
+    padding: 5px 10px;
+    border-bottom: 1px solid #1a2a1e;
+    color: #c0c0a0;
+    vertical-align: top;
+  }
+  #imgfilter-results .match-yes { color: #7ecfa0; font-weight: 600; }
+  #imgfilter-results .match-no  { color: #666; }
+  #imgfilter-results .error-row td { color: #f77e7e; }
   #organizer-bar {
     background: #12110a;
     border-bottom: 1px solid #3a2f10;
@@ -631,6 +716,7 @@
   </div>
   <div class="bar-group">
     <button id="btn-toggle-organizer">🗂 File Organizer</button>
+    <button id="btn-toggle-imgfilter">🔍 Image Filter</button>
   </div>
 </div>
 
@@ -676,6 +762,31 @@
   </div>
 </div>
 
+<!-- Image Filter Bar -->
+<div id="imgfilter-bar">
+  <div id="imgfilter-controls">
+    <span class="bar-label">🔍 Image Filter</span>
+    <input type="text" id="imgfilter-source" class="imgfilter-path-input"
+           placeholder="Source folder path">
+    <input type="text" id="imgfilter-query" class="imgfilter-query-input"
+           placeholder="Find images matching… (e.g. dogs outdoors)">
+    <input type="text" id="imgfilter-dest" class="imgfilter-path-input"
+           placeholder="Destination folder path">
+    <button id="btn-run-imgfilter">Find &amp; Move</button>
+    <span id="imgfilter-status"></span>
+  </div>
+  <div id="imgfilter-results">
+    <table>
+      <thead><tr>
+        <th>Filename</th>
+        <th>Description</th>
+        <th>Match</th>
+        <th>Destination</th>
+      </tr></thead>
+      <tbody id="imgfilter-results-body"></tbody>
+    </table>
+  </div>
+</div>
 <!-- Chat Area -->
 <div id="chat-area"></div>
 
@@ -1128,6 +1239,97 @@ function resetOrganizerResults() {
   document.getElementById('org-status').textContent = '';
   document.getElementById('org-status').style.color = '#a08040';
 }
+
+// --- Image Filter toggle ---
+document.getElementById('btn-toggle-imgfilter').addEventListener('click', function() {
+  const bar = document.getElementById('imgfilter-bar');
+  const orgBar = document.getElementById('organizer-bar');
+  const isVisible = bar.classList.contains('visible');
+  // Close organizer bar if open
+  orgBar.classList.remove('visible');
+  document.getElementById('btn-toggle-organizer').classList.remove('active');
+  bar.classList.toggle('visible', !isVisible);
+  this.classList.toggle('active', !isVisible);
+  if (isVisible) {
+    document.getElementById('imgfilter-results').classList.remove('visible');
+    document.getElementById('imgfilter-results-body').innerHTML = '';
+  }
+});
+
+// --- Run Image Filter ---
+document.getElementById('btn-run-imgfilter').addEventListener('click', async function() {
+  const source = document.getElementById('imgfilter-source').value.trim();
+  const query  = document.getElementById('imgfilter-query').value.trim();
+  const dest   = document.getElementById('imgfilter-dest').value.trim();
+  const status = document.getElementById('imgfilter-status');
+  if (!source || !query || !dest) {
+    status.textContent = 'Fill in all three fields first.';
+    status.style.color = '#f77e7e';
+    return;
+  }
+  document.getElementById('imgfilter-results').classList.remove('visible');
+  document.getElementById('imgfilter-results-body').innerHTML = '';
+  this.disabled = true;
+  status.textContent = 'Scanning and describing images… this may take a while.';
+  status.style.color = '#7ecfa0';
+  try {
+    const res = await fetch('/filter_images', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        source_folder: source,
+        query: query,
+        destination_folder: dest,
+      })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      status.textContent = '\u2717 ' + (data.detail || 'Error');
+      status.style.color = '#f77e7e';
+      this.disabled = false;
+      return;
+    }
+    if (data.total_images === 0) {
+      status.textContent = 'No image files found in that folder.';
+      status.style.color = '#f7c07e';
+      this.disabled = false;
+      return;
+    }
+    const tbody = document.getElementById('imgfilter-results-body');
+    tbody.innerHTML = '';
+    for (const r of (data.results || [])) {
+      const tr = document.createElement('tr');
+      const matchCell = r.matched
+        ? '<td class="match-yes">✔ Yes</td>'
+        : '<td class="match-no">— No</td>';
+      const destCell = r.moved
+        ? '<td>' + escapeHtml(r.destination || '') + '</td>'
+        : '<td>—</td>';
+      tr.innerHTML =
+        '<td>' + escapeHtml(r.filename) + '</td>' +
+        '<td>' + escapeHtml(r.description || '') + '</td>' +
+        matchCell + destCell;
+      tbody.appendChild(tr);
+    }
+    for (const err of (data.errors || [])) {
+      const tr = document.createElement('tr');
+      tr.className = 'error-row';
+      tr.innerHTML =
+        '<td>' + escapeHtml(err.filename) + '</td>' +
+        '<td colspan="3">' + escapeHtml(err.error) + '</td>';
+      tbody.appendChild(tr);
+    }
+    document.getElementById('imgfilter-results').classList.add('visible');
+    status.textContent =
+      data.moved + ' image' + (data.moved !== 1 ? 's' : '') + ' moved to destination' +
+      ' (' + data.matched + ' matched out of ' + data.total_images + ' scanned)';
+    status.style.color = '#7ecfa0';
+  } catch (err) {
+    status.textContent = '\u2717 Request failed: ' + err.message;
+    status.style.color = '#f77e7e';
+  }
+  this.disabled = false;
+});
 
 // --- Custom instructions toggle ---
 document.getElementById('org-instructions-toggle').addEventListener('click', function() {
