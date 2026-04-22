@@ -228,6 +228,17 @@
     font-size: 0.85rem;
     width: 220px;
   }
+  #imgfilter-vision-select {
+    background: #0d1f0d;
+    color: #b0d4b0;
+    border: 1px solid #2a4a2a;
+    border-radius: 4px;
+    padding: 6px 10px;
+    font-size: 0.82rem;
+    height: 36px;
+    min-width: 160px;
+    cursor: pointer;
+  }
   #btn-run-imgfilter {
     background: #1a4a2a;
     color: #7ecfa0;
@@ -772,6 +783,8 @@
            placeholder="Find images matching… (e.g. dogs outdoors)">
     <input type="text" id="imgfilter-dest" class="imgfilter-path-input"
            placeholder="Destination folder path">
+    <select id="imgfilter-vision-select" title="Vision model for image description">
+    </select>
     <button id="btn-run-imgfilter">Find &amp; Move</button>
     <span id="imgfilter-status"></span>
   </div>
@@ -900,6 +913,13 @@ async function loadModels() {
 
     routerSel.addEventListener('change', () => savePref('router_model', routerSel.value));
     reasonSel.addEventListener('change', () => savePref('reasoning_model', reasonSel.value));
+    const visionSel = document.getElementById('imgfilter-vision-select');
+    visionSel.innerHTML = models.map(m =>
+      `<option value="${m}">${m}</option>`
+    ).join('');
+    const savedVision = loadPref('vision_model', 'gemma4:e4b');
+    setSelectValue(visionSel, savedVision);
+    visionSel.addEventListener('change', () => savePref('vision_model', visionSel.value));
 
   } catch(e) {
     console.error('Failed to load models:', e);
@@ -1280,6 +1300,7 @@ document.getElementById('btn-run-imgfilter').addEventListener('click', async fun
         source_folder: source,
         query: query,
         destination_folder: dest,
+        vision_model: document.getElementById('imgfilter-vision-select').value || null,
       })
     });
     const data = await res.json();

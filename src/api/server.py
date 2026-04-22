@@ -96,6 +96,7 @@ class ImageFilterRequest(BaseModel):
     source_folder: str
     query: str
     destination_folder: str
+    vision_model: str = ""
 
 
 # --- Image Filter Endpoint ---
@@ -110,6 +111,7 @@ def filter_images_endpoint(request: ImageFilterRequest):
             source_folder=request.source_folder,
             query=request.query,
             destination_folder=request.destination_folder,
+            vision_model=request.vision_model or None,
         )
         return result
     except (FileNotFoundError, NotADirectoryError) as e:

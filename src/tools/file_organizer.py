@@ -125,12 +125,14 @@ def _extract_text(file_path: Path, max_chars: int = 2000) -> Optional[str]:
 
 # ── Image vision description ─────────────────────────────────────────────────
 
-def _describe_image(file_path: Path) -> Optional[str]:
+def _describe_image(file_path: Path, vision_model: Optional[str] = None) -> Optional[str]:
     """
-    Use gemma4:e4b vision to generate a plain-language description of an image.
+    Use a vision model to generate a plain-language description of an image.
 
-    Returns a text description (e.g. "a formal portrait photo of a person
-    in business attire with a serious expression") or None if the call fails.
+    vision_model: override the default router_llm for this call. Allows the
+    UI to select a dedicated vision model without changing the global config.
+
+    Returns a text description or None if the call fails.
 
     Why two-step (describe then classify)?
       Separating visual interpretation from category selection gives better
@@ -143,7 +145,7 @@ def _describe_image(file_path: Path) -> Optional[str]:
       string in the "images" field of the /api/generate request body.
     """
     base_url = OLLAMA.get("base_url", "http://localhost:11434")
-    model = MODELS.get("router_llm", "gemma4:e4b")
+    model = vision_model or MODELS.get("router_llm", "gemma4:e4b")
     timeout = OLLAMA.get("timeout_seconds", 3600)
 
     try:
@@ -537,6 +539,7 @@ def filter_images(
     source_folder: str,
     query: str,
     destination_folder: str,
+    vision_model: Optional[str] = None,
 ) -> dict:
     """
     Scan a folder for images, describe each one with vision, and move
@@ -602,7 +605,7 @@ def filter_images(
     for file_path in image_files:
         try:
             # Step 1: describe the image using vision
-            description = _describe_image(file_path)
+            description = _describe_image(file_path, vision_model=vision_model)
 
             if not description:
                 # Vision call failed — skip this file
