@@ -28,6 +28,10 @@ from src.projects.manager import (
     project_exists, delete_project
 )
 from src.tools.file_organizer import classify_files, execute_plan, filter_images
+from src.projects.drive_sync import (
+    sync_on_switch, save_workspace_to_primary,
+    backup_workspace_to_backup_drive, list_drive_workspaces
+)
 
 
 # --- App Setup ---
@@ -357,6 +361,79 @@ def organize_folder_execute(request: ExecutePlanRequest):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# --- Drive Sync Endpoints ---
+
+class SyncSwitchRequest(BaseModel):
+    from_project: Optional[str] = None
+    to_project: str
+
+
+@app.post("/projects/sync_switch")
+def sync_switch(request: SyncSwitchRequest):
+    """
+    Save the current project workspace to the primary drive,
+    then load the incoming project workspace from the primary drive.
+
+    Called by the UI before switching the active project.
+    Blocks the switch if the primary drive is not mounted.
+    If the incoming project has no drive copy yet (new project),
+    the load step is skipped and it will be saved on next switch.
+    """
+    result = sync_on_switch(
+        from_project=request.from_project,
+        to_project=request.to_project
+    )
+    if not result["ok"]:
+        raise HTTPException(status_code=503, detail=result["error"])
+    return result
+
+
+@app.post("/projects/{project_name}/save")
+def save_project(project_name: str):
+    """
+    Manually push the local workspace to the primary ai-models drive.
+    Safe to call at any time — rsync only copies changed files.
+    Blocks if the primary drive is not mounted.
+    """
+    if not project_exists(project_name):
+        raise HTTPException(
+            status_code=404,
+            detail=f"Project '{project_name}' not found."
+        )
+    result = save_workspace_to_primary(project_name)
+    if not result["ok"]:
+        raise HTTPException(status_code=503, detail=result["error"])
+    return result
+
+
+@app.post("/projects/{project_name}/backup")
+def backup_project(project_name: str):
+    """
+    Copy the local workspace to the backup drive on demand.
+    Blocks if the backup drive is not mounted.
+    Does not require a project switch — backs up whatever is active.
+    """
+    if not project_exists(project_name):
+        raise HTTPException(
+            status_code=404,
+            detail=f"Project '{project_name}' not found."
+        )
+    result = backup_workspace_to_backup_drive(project_name)
+    if not result["ok"]:
+        raise HTTPException(status_code=503, detail=result["error"])
+    return result
+
+
+@app.get("/projects/drive_workspaces")
+def drive_workspaces():
+    """
+    List all project workspaces currently stored on the primary drive.
+    Used by the UI to show which projects have a saved drive copy.
+    Returns empty list if drive is not mounted.
+    """
+    return {"workspaces": list_drive_workspaces()}
 
 
 # --- Project Management Endpoints ---

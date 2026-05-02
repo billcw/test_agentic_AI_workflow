@@ -83,6 +83,18 @@
   }
 
   #btn-new-project:hover { background: #1e4570; }
+  #btn-backup-project {
+    background: #1a3a2a;
+    border-color: #2d6e45;
+    color: #7ef7a0;
+  }
+  #btn-backup-project:hover { background: #1e4f30; }
+  #btn-delete-project {
+    background: #3a1a1a;
+    border-color: #8e2d2d;
+    color: #f77e7e;
+  }
+  #btn-delete-project:hover { background: #4f1e1e; }
 
   #upload-label {
     background: #1a3a2a;
@@ -689,6 +701,8 @@
     <span class="bar-label">Project</span>
     <select id="project-select"><option>Loading...</option></select>
     <button id="btn-new-project">+ New</button>
+    <button id="btn-backup-project" title="Backup workspace to backup drive">&#128190; Backup</button>
+    <button id="btn-delete-project" title="Delete this project permanently">&#128465; Delete</button>
   </div>
   <div class="bar-group">
     <span class="bar-label">Router model</span>
@@ -958,7 +972,33 @@ async function loadProjects() {
     await loadHistory(currentProject);
 
     sel.addEventListener('change', async () => {
-      currentProject = sel.value;
+      const fromProject = currentProject;
+      const toProject = sel.value;
+      if (fromProject === toProject) return;
+
+      // Auto-save current project to primary drive before switching
+      try {
+        const syncRes = await fetch('/projects/sync_switch', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({from_project: fromProject, to_project: toProject})
+        });
+        if (!syncRes.ok) {
+          const err = await syncRes.json();
+          alert('Project switch blocked: ' + (err.detail || 'Drive sync failed.') +
+                '\n\nMount the ai-models drive and try again:\n' +
+                'sudo mount /dev/sda1 /mnt/ai-models');
+          // Revert dropdown to previous project
+          setSelectValue(sel, fromProject);
+          return;
+        }
+      } catch(e) {
+        alert('Drive sync error: ' + e.message);
+        setSelectValue(sel, fromProject);
+        return;
+      }
+
+      currentProject = toProject;
       savePref('selected_project', currentProject);
       clearChat();
       await loadHistory(currentProject);
@@ -1512,6 +1552,67 @@ function escapeHtml(str) {
 }
 
 // --- New project modal ---
+// --- Backup project button ---
+document.getElementById('btn-backup-project').addEventListener('click', async () => {
+  if (!currentProject) {
+    alert('No project selected.');
+    return;
+  }
+  const btn = document.getElementById('btn-backup-project');
+  btn.disabled = true;
+  btn.textContent = 'Backing up...';
+  try {
+    const res = await fetch('/projects/' + encodeURIComponent(currentProject) + '/backup', {
+      method: 'POST'
+    });
+    const data = await res.json();
+    if (res.ok) {
+      alert('Backup complete: ' + (data.message || 'Workspace backed up to backup drive.'));
+    } else {
+      alert('Backup failed: ' + (data.detail || 'Unknown error.') +
+            '\n\nIs the backup drive mounted?\n' +
+            'sudo mount /dev/sdc1 /mnt/backup-drive');
+    }
+  } catch(e) {
+    alert('Backup error: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '\uD83D\uDCBE Backup';
+  }
+});
+
+// --- Delete project button ---
+document.getElementById('btn-delete-project').addEventListener('click', async () => {
+  if (!currentProject) {
+    alert('No project selected.');
+    return;
+  }
+  const confirmed = confirm(
+    'DELETE project "' + currentProject + '"?\n\n' +
+    'This will permanently remove the local workspace including\n' +
+    'all vectors, indexes, and chat history.\n\n' +
+    'Drive copies on ai-models are NOT deleted.\n\n' +
+    'This cannot be undone. Are you sure?'
+  );
+  if (!confirmed) return;
+  try {
+    const res = await fetch('/projects/' + encodeURIComponent(currentProject), {
+      method: 'DELETE'
+    });
+    const data = await res.json();
+    if (res.ok) {
+      alert('Project deleted.');
+      currentProject = null;
+      clearChat();
+      await loadProjects();
+    } else {
+      alert('Delete failed: ' + (data.detail || 'Unknown error.'));
+    }
+  } catch(e) {
+    alert('Delete error: ' + e.message);
+  }
+});
+
 document.getElementById('btn-new-project').addEventListener('click', () => {
   document.getElementById('modal-input').value = '';
   document.getElementById('modal-status').textContent = '';
