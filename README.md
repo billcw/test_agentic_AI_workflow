@@ -71,7 +71,9 @@ If you are also learning — this codebase is meant to be readable by you.
 - ⚖️ **Hybrid Weight Slider** — Live UI control to adjust the semantic/keyword search balance (0-100%) per query without restarting.
 - 📏 **Chunk Cap Controls** — Separate UI controls for email and document chunk character limits, allowing live tuning of context density without a server restart.
 - 🖼️ **Vision Capability** — Submit photos or screenshots for live analysis using Gemma 4 native vision support.
-- 🌐 **Browser Interface** — A custom dark-themed web UI accessible from any browser on your local network. No command line needed for end users.
+- 🌐 **Browser Interface** — A custom dark-themed three-tab web UI (Chat / Documents / Tools) accessible from any browser on your local network. No command line needed for end users.
+- 📂 **Folder Picker** — Every path input in the UI has a 📂 browse button that opens a live filesystem navigator — no more typing long paths by hand.
+- 🗄️ **Drive Sync** — Backup and restore project workspaces to an external drive with a single button click. Auto-saves on project switch.
 - ⚙️ **One Config File** — Everything lives in a single `config.yaml`. Deploy on any OS or hardware by editing one file.
 
 ---
@@ -104,6 +106,49 @@ Compares operator-reported actions against the official procedure. Flags steps m
 **Model:** `gemma4:31b` (deep)
 
 Analyzes emotional tone, urgency, and mood across emails and documents. Identifies frustrated, urgent, or critical communications and surfaces specific examples with citations. Automatically scoped to email sources when the query context indicates communications. Falls back to keyword analysis if the LLM call fails.
+
+---
+
+## Built-in Tools
+
+The Tools tab provides two standalone utilities that work on your local filesystem — independent of the chat agents and retrieval pipeline.
+
+### 🗂️ File Organizer
+
+AI-driven file classification and sorting. Point it at a source folder, and the system reads each file's actual content (not just the filename), classifies it into logical categories, and proposes a move plan — before touching anything.
+
+**How it works:**
+
+1. Enter a source folder path and a destination root folder (use the 📂 browse button for both)
+2. Click **Classify Files** — the system reads every file and asks `gemma4:e4b` where it belongs
+3. A dry-run table shows the proposed category and destination path for each file
+4. Review the plan, then click **Confirm & Move Files** to execute
+
+**Key behaviors:**
+
+- **Content-first classification** — The model reads the file body, not just the filename. A file named `report_final_v3_FINAL.docx` is classified by what's inside it.
+- **Vision classification for images** — Image files are described by the vision model before classification. The description feeds the classifier exactly like text content.
+- **Safety check** — The organizer refuses any destination path inside the project directory. This is a hard block, not a warning.
+- **Custom instructions** — Expand the Custom Instructions panel to add free-text guidance that is injected into every classification prompt. Use this to enforce your own naming conventions or domain-specific categories.
+
+### 🔎 Image Filter
+
+Vision-based image search. Find images that match a description and move them to a destination folder — without manually scanning hundreds of files.
+
+**How it works:**
+
+1. Enter a source folder path, a plain-language query describing what you're looking for, and a destination folder (use 📂 browse for all three)
+2. Select a vision model from the dropdown
+3. Click **Run Image Filter** — the system describes each image and evaluates whether it matches your query
+4. Matched images are moved to the destination folder immediately (no confirmation step)
+
+**How matching works — two stages:**
+
+**Stage 1 — Conservative text pre-check:** The system checks whether all meaningful words from your query appear as whole words in the image description. Stop words and query meta-words ("contains," "picture," "somewhere," "likeness," etc.) are stripped first, so the check focuses on the subject matter. If this pre-check fails, no vision call is made — skipping unnecessary API overhead for clearly non-matching images.
+
+**Stage 2 — Structured vision evaluation:** If Stage 1 passes, the model is called again with a structured JSON prompt asking it to return `{"match": true/false, "confidence": 0.0-1.0, "reason": "..."}`. A match requires both `match: true` AND `confidence >= 0.80`. This threshold prevents the model from calling something a match because a query word appeared incidentally in the description.
+
+This two-stage design dramatically reduces false positives compared to simple substring or any-word matching, while keeping unnecessary vision calls to a minimum.
 
 ---
 
@@ -240,6 +285,47 @@ Each answer shows the intent badge, a confidence score (1-5), and the source doc
 
 ---
 
+## The Web Interface
+
+The UI is a custom dark-themed single-page application organized into three tabs:
+
+### Tab 1 — Chat
+
+The main conversational interface. Type a question and the full agent pipeline runs automatically. The **Advanced** panel (collapsible) exposes per-query controls:
+
+- **Router model / Reasoning model** dropdowns — switch models without restarting the server
+- **Hybrid weight slider** — tune semantic vs. keyword balance (0-100%) per query
+- **Top-K / Top-K Final** inputs — control how many chunks are retrieved and passed to the agent
+- **Email chunk cap / Doc chunk cap** — limit how many characters per chunk reach the LLM, preventing context overflow on noisy email archives
+- **Custom instructions** — free-text guidance injected into every agent prompt for that query
+
+### Tab 2 — Documents
+
+Document management for the current project:
+
+- **Ingest Folder** — enter a folder path (or use 📂 browse) and ingest all supported files at once
+- **Upload Files** — drag-and-drop individual files directly into the current project
+
+### Tab 3 — Tools
+
+Standalone filesystem utilities:
+
+- **File Organizer** — AI-driven classification and sorting (see Built-in Tools above)
+- **Image Filter** — Vision-based image search and move (see Built-in Tools above)
+
+### Folder Picker
+
+Every path input field in the UI — source folder, destination folder, ingest path — has a 📂 browse button next to it. Clicking it opens a modal filesystem navigator:
+
+- **Single-click** a folder to select it
+- **Double-click** to navigate into it
+- **Up** button to go up one level
+- The navigator remembers the last-browsed location for the session
+
+No more typing absolute paths by hand or making typos in deeply nested directories.
+
+---
+
 ## Folder Structure
 
 ```
@@ -255,6 +341,8 @@ local-ai-doc-assistant/
 │   ├── retrieval/          ← hybrid search, MMR, multi-turn, re-ranker
 │   ├── agents/             ← five LangGraph agents + orchestrator
 │   ├── memory/             ← per-project chat history
+│   ├── projects/           ← workspace manager + drive sync
+│   ├── tools/              ← file organizer + image filter
 │   └── api/                ← FastAPI backend + custom web UI
 ├── workspaces/             ← YOUR data (gitignored)
 │   └── your-project/
@@ -292,6 +380,14 @@ local-ai-doc-assistant/
 | agentic-v2 | UI-controllable chunk caps — email and document | ✅ Complete |
 | agentic-v2 | MSG email file support via extract-msg | ✅ Complete |
 | agentic-v2 | Critic agent — response evaluation framework | 🔄 In Progress |
+| Post-merge | AI-driven file organizer with dry-run workflow | ✅ Complete |
+| Post-merge | Vision classification for image files | ✅ Complete |
+| Post-merge | Custom instructions for file organizer | ✅ Complete |
+| Post-merge | Image Filter — vision-based image search and move | ✅ Complete |
+| Post-merge | Drive sync — backup/restore workspaces to external drive | ✅ Complete |
+| Post-merge | Three-tab UI — Chat / Documents / Tools | ✅ Complete |
+| Post-merge | Folder picker — 📂 browse button on all path inputs | ✅ Complete |
+| Post-merge | Image filter matching — structured JSON + confidence threshold | ✅ Complete |
 
 ---
 
@@ -347,12 +443,14 @@ interface:
 
 - **Critic agent temporarily disabled** — Gemma 4 models return empty responses to structured evaluation prompts. The framework is architecturally complete and wired into the pipeline. Re-enabling requires an alternative prompting strategy or a model with reliable structured output.
 - **Ollama API endpoint** — Must use `/api/generate`, not `/api/chat`. The `/api/chat` endpoint triggers Gemma 4 extended thinking mode which consumes all tokens on internal reasoning and returns empty content.
+- **Vision calls require num_predict ≥ 500** — Gemma 4's thinking block consumes tokens before the actual response. With lower values, the response field is always empty with `done_reason: length`. The `thinking: false` Ollama option does not suppress this for vision calls.
 - **Hybrid weight sensitivity** — Semantic-heavy weighting (above 0.7) can systematically exclude document subsets when corpus types differ significantly. Default of 0.5 provides better balance across mixed PDF and email corpora. Use the UI slider to tune per query.
 - **config.yaml loads at import time** — Changes to `config.yaml` require a full server restart. `uvicorn --reload` will not pick up config changes alone.
 - **BM25Plus vs BM25Okapi** — BM25Okapi produces 0.0 IDF scores on small corpora. BM25Plus uses a lower-bound IDF formula that always produces positive scores and is used throughout.
 - **ChromaDB batch limit** — ChromaDB `add()` has a maximum of approximately 5461 records per call. The pipeline uses batches of 500 to stay safely within limits.
 - **Corrupt OST files** — Corrupt or partial OST archives will fail silently during ingestion. PST files are more reliably handled by libpff.
 - **num_predict tuning** — 3000 tokens is tuned for the reference hardware. Increasing this on systems with insufficient VRAM will cause the 31B model to fall back to CPU.
+- **File Organizer safety check** — The organizer hard-blocks any destination path inside the project directory. Verify destination paths are outside the project root before running.
 
 ---
 
@@ -360,6 +458,6 @@ interface:
 
 Released under the **Apache 2.0 License** — free to use, modify, and distribute for personal or commercial purposes.
 
-Built by **Bill Wenz** with **Claude (Anthropic)** as AI pair programming partner, April 2026. Every component — architecture decisions, code, retrieval tuning, agent prompts, and documentation — was developed collaboratively in an iterative session-based workflow between Bill and Claude.
+Built by **Bill Wenz** with **Claude (Anthropic)** as AI pair programming partner, April–May 2026. Every component — architecture decisions, code, retrieval tuning, agent prompts, and documentation — was developed collaboratively in an iterative session-based workflow between Bill and Claude.
 
 Contributions, bug reports, and hardware compatibility notes welcome via [GitHub Issues](https://github.com/billcw/test_agentic_AI_workflow/issues).
