@@ -166,6 +166,38 @@ def get_models():
         return {"models": [], "error": str(e)}
 
 
+# --- Filesystem Browse Endpoint ---
+
+@app.get("/fs/browse")
+def fs_browse(path: str = "/home/bill"):
+    """
+    Return the subdirectories of a given server-side path.
+    Used by the folder picker dialog in the UI.
+    Only returns directories, never files.
+    """
+    import os
+    target = Path(path).resolve()
+
+    if not target.exists():
+        raise HTTPException(status_code=400, detail=f"Path not found: {path}")
+    if not target.is_dir():
+        raise HTTPException(status_code=400, detail=f"Not a directory: {path}")
+
+    try:
+        entries = []
+        for entry in sorted(target.iterdir()):
+            if entry.is_dir() and not entry.name.startswith('.'):
+                entries.append(entry.name)
+        parent = str(target.parent) if target != target.parent else None
+        return {
+            "current": str(target),
+            "parent": parent,
+            "dirs": entries
+        }
+    except PermissionError:
+        raise HTTPException(status_code=403, detail=f"Permission denied: {path}")
+
+
 # --- Query Endpoint ---
 
 @app.post("/query", response_model=QueryResponse)

@@ -19,11 +19,12 @@ Why gemma4:e4b for classification?
 """
 
 import re
+import json
 import base64
 import shutil
 import requests
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Dict, Any
 
 from src.config import OLLAMA, MODELS
 
@@ -471,48 +472,62 @@ IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"}
 
 def _image_matches_query(description: str, query: str, file_path: Optional[Path] = None) -> bool:
     """
-    Determine whether an image matches a user query using a two-step approach.
+    Determine whether an image matches a user query.
 
-    Step 1 — String pre-check:
-      If any query word appears in the description (case-insensitive), return
-      True immediately. This is fast, requires no LLM call, and handles the
-      common case where the vision description already names the subject.
-      Example: query "dog", description "a fluffy dog on a lawn" → True.
+    Step 1 - Conservative description pre-check:
+      Requires ALL meaningful query words to appear as whole words in the
+      description (stop words removed). Stricter than the old any-word
+      substring check which caused false positives on common English words.
 
-    Step 2 — Direct vision check (fallback):
-      If the string pre-check fails AND file_path is provided, send the raw
-      image to gemma4:e4b with a short, focused yes/no prompt.
-      Why direct vision instead of description-based LLM matching?
-        The description-matching path requires a long prompt, which causes
-        e4b's thinking block to consume 150-250+ tokens before producing
-        output — making num_predict unpredictable. A short direct vision
-        prompt ("Does this image contain X?") keeps the thinking block small
-        and fits reliably within num_predict=50.
-      This also handles cases where the description frames the image
-      artistically and obscures the actual subject (e.g. broccoli described
-      primarily as a "whimsical arrangement with a birdhouse").
+    Step 2 - Direct vision check with structured JSON output:
+      Sends the raw image to gemma4:e4b with a structured prompt.
+      Requires match=true AND confidence >= 0.80 to return True.
+      Uses num_predict=500 so e4b thinking block does not consume all tokens.
 
-    Returns True if either step concludes the image matches.
+    Biased toward rejecting unless evidence is clear.
     """
     base_url = OLLAMA.get("base_url", "http://localhost:11434")
     model = MODELS.get("router_llm", "gemma4:e4b")
     timeout = OLLAMA.get("timeout_seconds", 3600)
 
-    # Step 1: string pre-check — any query word in description?
-    query_words = [w.strip().lower() for w in query.split() if len(w.strip()) > 2]
-    description_lower = description.lower()
-    if any(word in description_lower for word in query_words):
+    # Step 1: conservative description pre-check
+    _stop = {
+        "the", "a", "an", "and", "or", "of", "in", "on", "at", "to", "with",
+        "near", "by", "from", "for", "is", "are", "be", "being", "this", "that",
+        "image", "picture", "photo", "showing", "contains", "contain",
+        "somewhere", "likeness", "clearly", "some", "any", "has", "have"
+    }
+    def _wtok(t):
+        return set(re.findall(r"\b[a-zA-Z0-9]+\b", t.lower()))
+    _qwords = {w for w in _wtok(query) if len(w) > 2 and w not in _stop}
+    if _qwords and _qwords.issubset(_wtok(description)):
         return True
 
-    # Step 2: direct vision check on the raw image
+    # Step 2: direct vision check with structured JSON output
     if file_path is None or not file_path.exists():
         return False
 
     try:
         image_data = base64.b64encode(file_path.read_bytes()).decode("utf-8")
-
-        prompt = f"Does this image contain {query}? Respond with only YES or NO."
-
+        prompt = (
+            "You are an image-filtering verifier.\n\n"
+            "User query:\n" + query + "\n\n"
+            "Determine whether the image clearly satisfies the user query.\n"
+            "Rules:\n"
+            "- Answer based only on what is visibly present in the image.\n"
+            "- Do not infer hidden context, identity, purpose, or intent.\n"
+            "- ALL visible requirements in the query must be satisfied.\n"
+            "- If only part of the query is present, match must be false.\n"
+            "- If uncertain, match must be false.\n"
+            "- Return JSON only, no other text.\n\n"
+            "JSON schema:\n"
+            "{\n"
+            "  \"match\": true or false,\n"
+            "  \"confidence\": number from 0.0 to 1.0,\n"
+            "  \"visible_evidence\": [\"what you see\"],\n"
+            "  \"missing_or_uncertain\": [\"what is missing\"]\n"
+            "}"
+        )
         response = requests.post(
             f"{base_url}/api/generate",
             json={
@@ -520,17 +535,26 @@ def _image_matches_query(description: str, query: str, file_path: Optional[Path]
                 "prompt": prompt,
                 "images": [image_data],
                 "stream": False,
+                "format": "json",
                 "options": {
                     "temperature": 0.0,
-                    "num_predict": 50,
+                    "num_predict": 500,
                 }
             },
             timeout=timeout
         )
         response.raise_for_status()
-        answer = response.json().get("response", "").strip().upper()
-        return answer.startswith("YES")
-
+        raw_answer = response.json().get("response", "").strip()
+        try:
+            _parsed = json.loads(raw_answer)
+        except Exception:
+            _m = re.search(r"\{.*\}", raw_answer, flags=re.DOTALL)
+            _parsed = json.loads(_m.group(0)) if _m else None
+        if not _parsed:
+            return False
+        _match = bool(_parsed.get("match", False))
+        _conf = float(_parsed.get("confidence", 0.0))
+        return _match and _conf >= 0.80
     except Exception:
         return False
 

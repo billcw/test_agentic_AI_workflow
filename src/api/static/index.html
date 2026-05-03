@@ -17,9 +17,6 @@
     overflow: hidden;
   }
 
-  /* =========================================================
-     TOP BAR
-  ========================================================= */
   #topbar {
     background: #171c25;
     border-bottom: 1px solid #2a2f3e;
@@ -78,30 +75,13 @@
 
   button:hover { background: #2a3044; }
 
-  #btn-new-project {
-    background: #1a3a5c;
-    border-color: #2d5a8e;
-    color: #7eb8f7;
-  }
+  #btn-new-project { background: #1a3a5c; border-color: #2d5a8e; color: #7eb8f7; }
   #btn-new-project:hover { background: #1e4570; }
-
-  #btn-backup-project {
-    background: #1a3a2a;
-    border-color: #2d6e45;
-    color: #7ef7a0;
-  }
+  #btn-backup-project { background: #1a3a2a; border-color: #2d6e45; color: #7ef7a0; }
   #btn-backup-project:hover { background: #1e4f30; }
-
-  #btn-delete-project {
-    background: #3a1a1a;
-    border-color: #8e2d2d;
-    color: #f77e7e;
-  }
+  #btn-delete-project { background: #3a1a1a; border-color: #8e2d2d; color: #f77e7e; }
   #btn-delete-project:hover { background: #4f1e1e; }
 
-  /* =========================================================
-     TAB BAR
-  ========================================================= */
   #tab-bar {
     background: #13181f;
     border-bottom: 1px solid #2a2f3e;
@@ -109,7 +89,6 @@
     align-items: stretch;
     flex-shrink: 0;
     padding: 0 16px;
-    gap: 0;
   }
 
   .tab-btn {
@@ -126,19 +105,9 @@
     white-space: nowrap;
   }
 
-  .tab-btn:hover {
-    background: none;
-    color: #a8b4c8;
-  }
+  .tab-btn:hover { background: none; color: #a8b4c8; }
+  .tab-btn.active { color: #4f7ef7; border-bottom-color: #4f7ef7; }
 
-  .tab-btn.active {
-    color: #4f7ef7;
-    border-bottom-color: #4f7ef7;
-  }
-
-  /* =========================================================
-     TAB PANELS
-  ========================================================= */
   #tab-panels {
     flex: 1;
     overflow: hidden;
@@ -153,27 +122,19 @@
     overflow: hidden;
   }
 
-  .tab-panel.active {
-    display: flex;
-  }
+  .tab-panel.active { display: flex; }
 
-  /* =========================================================
-     TAB 1 — CHAT
-  ========================================================= */
-
-  /* Advanced panel (collapsed by default) */
+  /* --- Advanced bar --- */
   #advanced-bar {
     background: #13181f;
     border-bottom: 1px solid #2a2f3e;
     overflow: hidden;
     max-height: 0;
-    transition: max-height 0.25s ease, padding 0.25s ease;
+    transition: max-height 0.25s ease;
     flex-shrink: 0;
   }
 
-  #advanced-bar.open {
-    max-height: 120px;
-  }
+  #advanced-bar.open { max-height: 120px; }
 
   #advanced-bar-inner {
     padding: 8px 16px;
@@ -186,7 +147,6 @@
   #btn-toggle-advanced {
     background: none;
     border: none;
-    border-bottom: 1px solid transparent;
     border-radius: 0;
     color: #4a5568;
     font-size: 11px;
@@ -195,26 +155,18 @@
     display: flex;
     align-items: center;
     gap: 4px;
-    flex-shrink: 0;
     transition: color 0.15s;
-    align-self: flex-start;
     margin: 0;
   }
 
-  #btn-toggle-advanced:hover {
-    background: none;
-    color: #7eb8f7;
-  }
+  #btn-toggle-advanced:hover { background: none; color: #7eb8f7; }
 
   #btn-toggle-advanced .chevron {
     display: inline-block;
     transition: transform 0.2s ease;
-    font-style: normal;
   }
 
-  #btn-toggle-advanced.open .chevron {
-    transform: rotate(180deg);
-  }
+  #btn-toggle-advanced.open .chevron { transform: rotate(180deg); }
 
   #advanced-toggle-row {
     background: #0f1117;
@@ -222,10 +174,8 @@
     display: flex;
     align-items: center;
     flex-shrink: 0;
-    padding: 0;
   }
 
-  /* number inputs in advanced bar */
   #advanced-bar-inner input[type="number"],
   #advanced-bar-inner input[type="range"] {
     background: #1e2433;
@@ -238,11 +188,9 @@
   }
 
   #advanced-bar-inner input[type="number"]:focus,
-  #advanced-bar-inner input[type="range"]:focus {
-    border-color: #4f7ef7;
-  }
+  #advanced-bar-inner input[type="range"]:focus { border-color: #4f7ef7; }
 
-  /* Chat area */
+  /* --- Chat --- */
   #chat-area {
     flex: 1;
     overflow-y: auto;
@@ -253,11 +201,7 @@
     scroll-behavior: smooth;
   }
 
-  .message {
-    max-width: 820px;
-    width: 100%;
-    margin: 0 auto;
-  }
+  .message { max-width: 820px; width: 100%; margin: 0 auto; }
 
   .message.user .bubble {
     background: #1e2a3a;
@@ -280,12 +224,7 @@
     line-height: 1.6;
   }
 
-  .message-meta {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 5px;
-    align-items: center;
-  }
+  .message-meta { display: flex; gap: 8px; margin-bottom: 5px; align-items: center; }
 
   .role-label {
     font-size: 11px;
@@ -309,79 +248,35 @@
   .intent-check        { background: #1a3a2a; color: #7ef7b0; }
   .intent-lookup       { background: #2a2a1a; color: #f7e07e; }
 
-  .confidence-badge {
-    font-size: 10px;
-    padding: 1px 7px;
-    border-radius: 10px;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-  }
-
+  .confidence-badge { font-size: 10px; padding: 1px 7px; border-radius: 10px; font-weight: 600; letter-spacing: 0.04em; }
   .confidence-ok  { background: #1a2a1a; color: #7ef7b0; }
   .confidence-low { background: #3a2a00; color: #f7c07e; }
-  .confidence-warn-text {
-    font-size: 11px;
-    color: #f7c07e;
-    margin-top: 6px;
-    display: block;
-  }
+  .confidence-warn-text { font-size: 11px; color: #f7c07e; margin-top: 6px; display: block; }
 
   .history-divider {
-    max-width: 820px;
-    width: 100%;
-    margin: 0 auto;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    color: #3a4255;
-    font-size: 11px;
+    max-width: 820px; width: 100%; margin: 0 auto;
+    display: flex; align-items: center; gap: 10px;
+    color: #3a4255; font-size: 11px;
+  }
+  .history-divider::before, .history-divider::after {
+    content: ''; flex: 1; height: 1px; background: #2a2f3e;
   }
 
-  .history-divider::before,
-  .history-divider::after {
-    content: '';
-    flex: 1;
-    height: 1px;
-    background: #2a2f3e;
-  }
-
-  .sources {
-    margin-top: 8px;
-    font-size: 11px;
-    color: #4f7ef7;
-  }
-
+  .sources { margin-top: 8px; font-size: 11px; color: #4f7ef7; }
   .sources span {
-    background: #1a2440;
-    border: 1px solid #2a3a60;
-    border-radius: 4px;
-    padding: 1px 6px;
-    margin-right: 4px;
-    display: inline-block;
+    background: #1a2440; border: 1px solid #2a3a60;
+    border-radius: 4px; padding: 1px 6px; margin-right: 4px; display: inline-block;
   }
 
   .bubble p { margin-bottom: 8px; }
   .bubble strong { color: #c8d8f0; }
   .bubble code {
-    background: #0d1117;
-    padding: 1px 5px;
-    border-radius: 3px;
-    font-family: 'Courier New', monospace;
-    font-size: 12px;
-    color: #7ef7b0;
+    background: #0d1117; padding: 1px 5px; border-radius: 3px;
+    font-family: 'Courier New', monospace; font-size: 12px; color: #7ef7b0;
   }
-  .bubble h1, .bubble h2, .bubble h3 {
-    color: #c8d8f0;
-    margin: 10px 0 4px 0;
-    font-size: 14px;
-  }
+  .bubble h1, .bubble h2, .bubble h3 { color: #c8d8f0; margin: 10px 0 4px 0; font-size: 14px; }
+  .thinking .bubble { color: #4f5a6b; font-style: italic; }
 
-  .thinking .bubble {
-    color: #4f5a6b;
-    font-style: italic;
-  }
-
-  /* Input bar */
   #input-bar {
     background: #171c25;
     border-top: 1px solid #2a2f3e;
@@ -411,432 +306,312 @@
   #input-bar textarea:focus { border-color: #4f7ef7; }
 
   #btn-send {
-    background: #4f7ef7;
-    border-color: #4f7ef7;
-    color: white;
-    padding: 10px 18px;
-    font-size: 14px;
-    border-radius: 8px;
-    height: 44px;
+    background: #4f7ef7; border-color: #4f7ef7; color: white;
+    padding: 10px 18px; font-size: 14px; border-radius: 8px; height: 44px;
   }
-
   #btn-send:hover { background: #3d6de0; }
   #btn-send:disabled { background: #2a3044; border-color: #2a3044; color: #4f5a6b; cursor: not-allowed; }
 
-  /* =========================================================
-     TAB 2 — DOCUMENTS
-  ========================================================= */
-  #panel-documents {
-    overflow-y: auto;
-    padding: 20px 16px;
-    gap: 16px;
-  }
+  /* --- Documents tab --- */
+  #panel-documents { overflow-y: auto; padding: 20px 16px; gap: 16px; }
 
   .doc-card {
-    background: #171c25;
-    border: 1px solid #2a2f3e;
-    border-radius: 10px;
-    padding: 16px 20px;
-    max-width: 720px;
+    background: #171c25; border: 1px solid #2a2f3e;
+    border-radius: 10px; padding: 16px 20px; max-width: 720px;
   }
 
-  .doc-card h2 {
-    font-size: 13px;
-    font-weight: 600;
-    color: #a8b4c8;
-    margin-bottom: 12px;
-    letter-spacing: 0.03em;
-  }
-
-  .doc-card-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
-  }
+  .doc-card h2 { font-size: 13px; font-weight: 600; color: #a8b4c8; margin-bottom: 12px; letter-spacing: 0.03em; }
+  .doc-card-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
   .doc-path-input {
-    flex: 1;
-    min-width: 220px;
-    background: #1e2433;
-    color: #ececec;
-    border: 1px solid #2a2f3e;
-    border-radius: 6px;
-    padding: 6px 10px;
-    font-size: 12px;
-    font-family: 'Courier New', monospace;
-    outline: none;
+    flex: 1; min-width: 220px;
+    background: #1e2433; color: #ececec;
+    border: 1px solid #2a2f3e; border-radius: 6px;
+    padding: 6px 10px; font-size: 12px;
+    font-family: 'Courier New', monospace; outline: none;
   }
-
   .doc-path-input:focus { border-color: #4f7ef7; }
   .doc-path-input::placeholder { color: #4f5a6b; }
 
-  #btn-ingest-folder {
-    background: #2a1a3a;
-    border-color: #5a2d8e;
-    color: #c07ef7;
-  }
-
+  #btn-ingest-folder { background: #2a1a3a; border-color: #5a2d8e; color: #c07ef7; }
   #btn-ingest-folder:hover { background: #341a50; }
   #btn-ingest-folder:disabled { background: #1e2433; color: #4f5a6b; cursor: not-allowed; }
 
-  .force-label {
-    font-size: 11px;
-    color: #6b7280;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    cursor: pointer;
-    white-space: nowrap;
-  }
-
+  .force-label { font-size: 11px; color: #6b7280; display: flex; align-items: center; gap: 4px; cursor: pointer; white-space: nowrap; }
   .force-label input[type="checkbox"] { cursor: pointer; }
 
-  #folder-status {
-    font-size: 11px;
-    color: #6b7280;
-    margin-top: 8px;
-    min-height: 16px;
-  }
+  #folder-status { font-size: 11px; color: #6b7280; margin-top: 8px; min-height: 16px; }
 
   #upload-label {
-    background: #1a3a2a;
-    border: 1px solid #2d6e45;
-    border-radius: 6px;
-    padding: 6px 14px;
-    font-size: 12px;
-    cursor: pointer;
-    color: #7ef7b0;
-    white-space: nowrap;
-    transition: background 0.15s;
-    display: inline-block;
+    background: #1a3a2a; border: 1px solid #2d6e45; border-radius: 6px;
+    padding: 6px 14px; font-size: 12px; cursor: pointer; color: #7ef7b0;
+    white-space: nowrap; transition: background 0.15s; display: inline-block;
   }
-
   #upload-label:hover { background: #1e4533; }
   #upload-input { display: none; }
+  #upload-status { font-size: 11px; color: #6b7280; margin-top: 6px; min-height: 16px; }
 
-  #upload-status {
-    font-size: 11px;
-    color: #6b7280;
-    margin-top: 6px;
-    min-height: 16px;
-  }
-
-  /* =========================================================
-     TAB 3 — TOOLS
-  ========================================================= */
-  #panel-tools {
-    overflow-y: auto;
-    padding: 20px 16px;
-    gap: 16px;
-  }
+  /* --- Tools tab --- */
+  #panel-tools { overflow-y: auto; padding: 20px 16px; gap: 16px; }
 
   .tool-card {
-    background: #171c25;
-    border: 1px solid #2a2f3e;
-    border-radius: 10px;
-    padding: 16px 20px;
-    max-width: 860px;
+    background: #171c25; border: 1px solid #2a2f3e;
+    border-radius: 10px; padding: 16px 20px; max-width: 860px;
   }
-
-  .tool-card h2 {
-    font-size: 13px;
-    font-weight: 600;
-    color: #a8b4c8;
-    margin-bottom: 12px;
-    letter-spacing: 0.03em;
-  }
-
-  .tool-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
-    margin-bottom: 8px;
-  }
-
+  .tool-card h2 { font-size: 13px; font-weight: 600; color: #a8b4c8; margin-bottom: 12px; letter-spacing: 0.03em; }
+  .tool-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
   .tool-row:last-child { margin-bottom: 0; }
 
-  /* File Organizer card */
   #tool-card-organizer { border-color: #3a2f10; }
   #tool-card-organizer h2 { color: #f7c07e; }
 
   .org-path-input {
-    flex: 1;
-    min-width: 260px;
-    background: #1e1c10;
-    color: #ececec;
-    border: 1px solid #3a2f10;
-    border-radius: 6px;
-    padding: 6px 10px;
-    font-size: 12px;
-    font-family: 'Courier New', monospace;
-    outline: none;
+    flex: 1; min-width: 260px;
+    background: #1e1c10; color: #ececec;
+    border: 1px solid #3a2f10; border-radius: 6px;
+    padding: 6px 10px; font-size: 12px;
+    font-family: 'Courier New', monospace; outline: none;
   }
-
   .org-path-input:focus { border-color: #c07e20; }
   .org-path-input::placeholder { color: #5a4a20; }
 
-  #btn-classify {
-    background: #2a1f0a;
-    border-color: #6b4c10;
-    color: #f7c07e;
-    padding: 5px 14px;
-  }
-
+  #btn-classify { background: #2a1f0a; border-color: #6b4c10; color: #f7c07e; padding: 5px 14px; }
   #btn-classify:hover { background: #3a2a0e; }
   #btn-classify:disabled { background: #1e1c10; color: #4f4a30; cursor: not-allowed; }
 
   #btn-execute-plan {
-    background: #1a3a1a;
-    border-color: #2d6e2d;
-    color: #7ef7b0;
-    padding: 5px 14px;
-    visibility: hidden;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.15s;
+    background: #1a3a1a; border-color: #2d6e2d; color: #7ef7b0; padding: 5px 14px;
+    visibility: hidden; opacity: 0; pointer-events: none; transition: opacity 0.15s;
   }
-
-  #btn-execute-plan.ready {
-    visibility: visible;
-    opacity: 1;
-    pointer-events: auto;
-  }
-
+  #btn-execute-plan.ready { visibility: visible; opacity: 1; pointer-events: auto; }
   #btn-execute-plan:hover { background: #1e4a1e; }
   #btn-execute-plan:disabled { background: #1e1c10; color: #4f4a30; cursor: not-allowed; }
 
-  #org-status {
-    font-size: 11px;
-    color: #a08040;
-    margin-top: 4px;
-    min-height: 16px;
-  }
+  #org-status { font-size: 11px; color: #a08040; margin-top: 4px; min-height: 16px; }
 
   #org-instructions-toggle {
-    background: none;
-    border: none;
-    color: #a08040;
-    font-size: 0.82rem;
-    cursor: pointer;
-    padding: 0;
-    text-decoration: underline;
-    text-underline-offset: 2px;
+    background: none; border: none; color: #a08040;
+    font-size: 0.82rem; cursor: pointer; padding: 0;
+    text-decoration: underline; text-underline-offset: 2px;
   }
-
   #org-instructions-toggle:hover { background: none; color: #f7c07e; }
 
-  #org-instructions-wrap {
-    display: none;
-    margin-top: 6px;
-    margin-bottom: 4px;
-  }
-
+  #org-instructions-wrap { display: none; margin-top: 6px; margin-bottom: 4px; }
   #org-instructions-wrap.visible { display: block; }
 
   #org-instructions {
-    width: 100%;
-    min-height: 56px;
-    background: #1a1a1a;
-    color: #e0d6c2;
-    border: 1px solid #444;
-    border-radius: 4px;
-    padding: 6px 8px;
-    font-size: 0.82rem;
-    resize: vertical;
-    box-sizing: border-box;
+    width: 100%; min-height: 56px;
+    background: #1a1a1a; color: #e0d6c2;
+    border: 1px solid #444; border-radius: 4px;
+    padding: 6px 8px; font-size: 0.82rem; resize: vertical;
   }
-
   #org-instructions::placeholder { color: #666; }
 
   #organizer-results {
-    display: none;
-    max-height: 260px;
-    overflow-y: auto;
-    border: 1px solid #3a2f10;
-    border-radius: 6px;
-    background: #0e0d08;
-    margin-top: 8px;
+    display: none; max-height: 260px; overflow-y: auto;
+    border: 1px solid #3a2f10; border-radius: 6px;
+    background: #0e0d08; margin-top: 8px;
   }
-
   #organizer-results.visible { display: block; }
-
-  #organizer-results table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 11px;
-  }
-
-  #organizer-results thead tr {
-    background: #1e1c10;
-    position: sticky;
-    top: 0;
-  }
-
-  #organizer-results th {
-    padding: 6px 10px;
-    text-align: left;
-    color: #a08040;
-    font-weight: 600;
-    border-bottom: 1px solid #3a2f10;
-    white-space: nowrap;
-  }
-
-  #organizer-results td {
-    padding: 5px 10px;
-    color: #c8b880;
-    border-bottom: 1px solid #1e1c10;
-    font-family: 'Courier New', monospace;
-    word-break: break-all;
-  }
-
+  #organizer-results table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  #organizer-results thead tr { background: #1e1c10; position: sticky; top: 0; }
+  #organizer-results th { padding: 6px 10px; text-align: left; color: #a08040; font-weight: 600; border-bottom: 1px solid #3a2f10; white-space: nowrap; }
+  #organizer-results td { padding: 5px 10px; color: #c8b880; border-bottom: 1px solid #1e1c10; font-family: 'Courier New', monospace; word-break: break-all; }
   #organizer-results tr:last-child td { border-bottom: none; }
-
-  #organizer-results td.cat-cell {
-    color: #ffd580;
-    font-family: inherit;
-    font-weight: 600;
-    word-break: normal;
-  }
-
+  #organizer-results td.cat-cell { color: #ffd580; font-family: inherit; font-weight: 600; word-break: normal; }
   #organizer-results .error-row td { color: #f77e7e; }
 
-  /* Image Filter card */
   #tool-card-imgfilter { border-color: #2a4a34; }
   #tool-card-imgfilter h2 { color: #7ecfa0; }
 
   .imgfilter-path-input {
-    background: #1a2a1e;
-    color: #e0d6c2;
-    border: 1px solid #2a4a34;
-    border-radius: 4px;
-    padding: 6px 8px;
-    font-size: 0.85rem;
-    width: 240px;
-    outline: none;
+    background: #1a2a1e; color: #e0d6c2;
+    border: 1px solid #2a4a34; border-radius: 4px;
+    padding: 6px 8px; font-size: 0.85rem; width: 220px; outline: none;
   }
-
   .imgfilter-query-input {
-    background: #1a2a1e;
-    color: #e0d6c2;
-    border: 1px solid #2a4a34;
-    border-radius: 4px;
-    padding: 6px 8px;
-    font-size: 0.85rem;
-    width: 200px;
-    outline: none;
+    background: #1a2a1e; color: #e0d6c2;
+    border: 1px solid #2a4a34; border-radius: 4px;
+    padding: 6px 8px; font-size: 0.85rem; width: 180px; outline: none;
   }
 
   #imgfilter-vision-select {
-    background: #0d1f0d;
-    color: #b0d4b0;
-    border: 1px solid #2a4a2a;
-    border-radius: 4px;
-    padding: 5px 10px;
-    font-size: 0.82rem;
-    min-width: 160px;
-    cursor: pointer;
+    background: #0d1f0d; color: #b0d4b0;
+    border: 1px solid #2a4a2a; border-radius: 4px;
+    padding: 5px 10px; font-size: 0.82rem; min-width: 160px; cursor: pointer;
   }
 
   #btn-run-imgfilter {
-    background: #1a4a2a;
-    color: #7ecfa0;
-    border: 1px solid #2a6a44;
-    border-radius: 4px;
-    padding: 5px 14px;
-    cursor: pointer;
-    font-size: 0.85rem;
+    background: #1a4a2a; color: #7ecfa0; border: 1px solid #2a6a44;
+    border-radius: 4px; padding: 5px 14px; cursor: pointer; font-size: 0.85rem;
   }
-
   #btn-run-imgfilter:hover { background: #0a3a1a; }
 
-  #imgfilter-status {
-    font-size: 11px;
-    color: #7ecfa0;
-    margin-top: 4px;
-    min-height: 16px;
-  }
+  #imgfilter-status { font-size: 11px; color: #7ecfa0; margin-top: 4px; min-height: 16px; }
 
-  #imgfilter-results {
-    display: none;
-    margin-top: 8px;
-    overflow-x: auto;
-  }
-
+  #imgfilter-results { display: none; margin-top: 8px; overflow-x: auto; }
   #imgfilter-results.visible { display: block; }
-
-  #imgfilter-results table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.82rem;
-  }
-
+  #imgfilter-results table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
   #imgfilter-results thead tr { background: #0a2a14; }
-
-  #imgfilter-results th {
-    text-align: left;
-    padding: 6px 10px;
-    color: #7ecfa0;
-    border-bottom: 1px solid #2a4a34;
-    font-weight: 600;
-  }
-
-  #imgfilter-results td {
-    padding: 5px 10px;
-    border-bottom: 1px solid #1a2a1e;
-    color: #c0c0a0;
-    vertical-align: top;
-  }
-
+  #imgfilter-results th { text-align: left; padding: 6px 10px; color: #7ecfa0; border-bottom: 1px solid #2a4a34; font-weight: 600; }
+  #imgfilter-results td { padding: 5px 10px; border-bottom: 1px solid #1a2a1e; color: #c0c0a0; vertical-align: top; }
   #imgfilter-results .match-yes { color: #7ecfa0; font-weight: 600; }
   #imgfilter-results .match-no  { color: #666; }
   #imgfilter-results .error-row td { color: #f77e7e; }
 
-  /* =========================================================
-     MODAL
-  ========================================================= */
-  #modal-overlay {
+  /* --- Browse button --- */
+  .btn-browse {
+    background: #1e2433;
+    border: 1px solid #2a2f3e;
+    border-radius: 6px;
+    color: #7eb8f7;
+    font-size: 14px;
+    padding: 4px 8px;
+    cursor: pointer;
+    line-height: 1;
+    flex-shrink: 0;
+    transition: background 0.15s;
+  }
+  .btn-browse:hover { background: #2a3044; }
+
+  /* --- Folder Picker Modal --- */
+  #picker-overlay {
     display: none;
     position: fixed;
     inset: 0;
-    background: rgba(0,0,0,0.6);
-    z-index: 100;
+    background: rgba(0,0,0,0.65);
+    z-index: 200;
     align-items: center;
     justify-content: center;
   }
+  #picker-overlay.visible { display: flex; }
 
-  #modal-overlay.visible { display: flex; }
-
-  #modal {
+  #picker-modal {
     background: #171c25;
     border: 1px solid #2a2f3e;
     border-radius: 12px;
-    padding: 24px;
-    width: 340px;
+    width: 520px;
+    max-width: 94vw;
+    max-height: 72vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
   }
 
-  #modal h2 { font-size: 15px; margin-bottom: 14px; color: #ececec; }
+  #picker-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid #2a2f3e;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
 
-  #modal input {
-    width: 100%;
+  #picker-header h2 { font-size: 13px; font-weight: 600; color: #a8b4c8; flex-shrink: 0; }
+
+  #picker-current-path {
+    flex: 1;
+    font-size: 11px;
+    font-family: 'Courier New', monospace;
+    color: #4f7ef7;
     background: #1e2433;
-    color: #ececec;
+    border: 1px solid #2a2f3e;
+    border-radius: 4px;
+    padding: 4px 8px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  #picker-up-btn {
+    background: #1e2433;
     border: 1px solid #2a2f3e;
     border-radius: 6px;
-    padding: 8px 10px;
+    color: #a8b4c8;
+    font-size: 12px;
+    padding: 4px 10px;
+    cursor: pointer;
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+  #picker-up-btn:hover { background: #2a3044; }
+  #picker-up-btn:disabled { color: #3a4255; cursor: not-allowed; }
+
+  #picker-list { flex: 1; overflow-y: auto; padding: 6px 0; }
+
+  .picker-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 16px;
     font-size: 13px;
-    outline: none;
-    margin-bottom: 14px;
+    font-family: 'Courier New', monospace;
+    color: #c8d8f0;
+    cursor: pointer;
+    border-left: 2px solid transparent;
+    transition: background 0.1s;
+    user-select: none;
+  }
+  .picker-item:hover { background: #1e2433; }
+  .picker-item.selected { background: #1a2a40; border-left-color: #4f7ef7; color: #7eb8f7; }
+  .picker-item-icon { font-size: 14px; flex-shrink: 0; }
+
+  #picker-empty { padding: 20px 16px; font-size: 12px; color: #4f5a6b; font-style: italic; }
+  #picker-loading { padding: 20px 16px; font-size: 12px; color: #4f5a6b; font-style: italic; }
+
+  #picker-footer {
+    padding: 10px 16px;
+    border-top: 1px solid #2a2f3e;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
   }
 
+  #picker-selected-label {
+    flex: 1;
+    font-size: 11px;
+    font-family: 'Courier New', monospace;
+    color: #6b7280;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  #picker-select-btn {
+    background: #4f7ef7; border-color: #4f7ef7; color: white;
+    padding: 6px 16px; border-radius: 6px; font-size: 12px;
+  }
+  #picker-select-btn:hover { background: #3d6de0; }
+  #picker-select-btn:disabled { background: #2a3044; border-color: #2a3044; color: #4f5a6b; cursor: not-allowed; }
+
+  #picker-cancel-btn {
+    background: #1e2433; border-color: #2a2f3e; color: #6b7280;
+    padding: 6px 14px; border-radius: 6px; font-size: 12px;
+  }
+
+  /* --- Project Modal --- */
+  #modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.6); z-index: 100;
+    align-items: center; justify-content: center;
+  }
+  #modal-overlay.visible { display: flex; }
+
+  #modal {
+    background: #171c25; border: 1px solid #2a2f3e;
+    border-radius: 12px; padding: 24px; width: 340px;
+  }
+  #modal h2 { font-size: 15px; margin-bottom: 14px; color: #ececec; }
+  #modal input {
+    width: 100%; background: #1e2433; color: #ececec;
+    border: 1px solid #2a2f3e; border-radius: 6px;
+    padding: 8px 10px; font-size: 13px; outline: none; margin-bottom: 14px;
+  }
   #modal input:focus { border-color: #4f7ef7; }
   .modal-buttons { display: flex; gap: 8px; justify-content: flex-end; }
   #modal-status { font-size: 12px; color: #f77e7e; min-height: 16px; margin-bottom: 8px; }
 
-  /* =========================================================
-     SCROLLBAR
-  ========================================================= */
   ::-webkit-scrollbar { width: 6px; }
   ::-webkit-scrollbar-track { background: #0f1117; }
   ::-webkit-scrollbar-thumb { background: #2a2f3e; border-radius: 3px; }
@@ -844,7 +619,6 @@
 </head>
 <body>
 
-<!-- ===================== TOP BAR ===================== -->
 <div id="topbar">
   <h1>📄 Doc Assistant</h1>
   <div class="bar-group">
@@ -856,27 +630,21 @@
   </div>
 </div>
 
-<!-- ===================== TAB BAR ===================== -->
 <div id="tab-bar">
   <button class="tab-btn active" data-tab="chat">💬 Chat</button>
   <button class="tab-btn" data-tab="documents">📁 Documents</button>
   <button class="tab-btn" data-tab="tools">🛠 Tools</button>
 </div>
 
-<!-- ===================== TAB PANELS ===================== -->
 <div id="tab-panels">
 
-  <!-- ---- TAB 1: CHAT ---- -->
+  <!-- TAB 1: CHAT -->
   <div class="tab-panel active" id="panel-chat">
-
-    <!-- Advanced toggle row -->
     <div id="advanced-toggle-row">
       <button id="btn-toggle-advanced">
         <span class="chevron">&#8964;</span>&nbsp;Advanced
       </button>
     </div>
-
-    <!-- Advanced collapsible panel -->
     <div id="advanced-bar">
       <div id="advanced-bar-inner">
         <div class="bar-group">
@@ -910,26 +678,21 @@
         </div>
       </div>
     </div>
-
-    <!-- Chat messages -->
     <div id="chat-area"></div>
-
-    <!-- Input bar -->
     <div id="input-bar">
       <textarea id="query-input" placeholder="Ask a question about your documents..." rows="1"></textarea>
       <button id="btn-send">Send</button>
     </div>
   </div>
 
-  <!-- ---- TAB 2: DOCUMENTS ---- -->
+  <!-- TAB 2: DOCUMENTS -->
   <div class="tab-panel" id="panel-documents">
-
-    <!-- Folder ingest card -->
     <div class="doc-card">
       <h2>📁 Ingest Folder</h2>
       <div class="doc-card-row">
         <input type="text" id="folder-path-input" class="doc-path-input"
                placeholder="/absolute/path/to/folder">
+        <button class="btn-browse" data-target="folder-path-input" title="Browse folders">📂</button>
         <label class="force-label">
           <input type="checkbox" id="force-reingest"> re-ingest already indexed
         </label>
@@ -937,8 +700,6 @@
       </div>
       <div id="folder-status"></div>
     </div>
-
-    <!-- File upload card -->
     <div class="doc-card">
       <h2>⬆ Upload Files</h2>
       <div class="doc-card-row">
@@ -948,18 +709,16 @@
       </div>
       <div id="upload-status"></div>
     </div>
-
   </div>
 
-  <!-- ---- TAB 3: TOOLS ---- -->
+  <!-- TAB 3: TOOLS -->
   <div class="tab-panel" id="panel-tools">
-
-    <!-- File Organizer card -->
     <div class="tool-card" id="tool-card-organizer">
       <h2>🗂 File Organizer</h2>
       <div class="tool-row">
         <input type="text" id="org-folder-path" class="org-path-input"
                placeholder="/absolute/path/to/folder  (outside project directory)">
+        <button class="btn-browse" data-target="org-folder-path" title="Browse folders">📂</button>
         <button id="btn-classify">Classify Files</button>
         <button id="btn-execute-plan">✓ Confirm &amp; Move Files</button>
       </div>
@@ -973,28 +732,23 @@
       <div id="org-status"></div>
       <div id="organizer-results">
         <table>
-          <thead>
-            <tr>
-              <th>Filename</th>
-              <th>Category</th>
-              <th>Destination</th>
-            </tr>
-          </thead>
+          <thead><tr><th>Filename</th><th>Category</th><th>Destination</th></tr></thead>
           <tbody id="organizer-results-body"></tbody>
         </table>
       </div>
     </div>
 
-    <!-- Image Filter card -->
     <div class="tool-card" id="tool-card-imgfilter">
       <h2>🔍 Image Filter</h2>
       <div class="tool-row">
         <input type="text" id="imgfilter-source" class="imgfilter-path-input"
                placeholder="Source folder path">
+        <button class="btn-browse" data-target="imgfilter-source" title="Browse folders">📂</button>
         <input type="text" id="imgfilter-query" class="imgfilter-query-input"
                placeholder="Find images matching…">
         <input type="text" id="imgfilter-dest" class="imgfilter-path-input"
                placeholder="Destination folder path">
+        <button class="btn-browse" data-target="imgfilter-dest" title="Browse folders">📂</button>
         <select id="imgfilter-vision-select" title="Vision model for image description"></select>
         <button id="btn-run-imgfilter">Find &amp; Move</button>
       </div>
@@ -1002,20 +756,36 @@
       <div id="imgfilter-results">
         <table>
           <thead><tr>
-            <th>Filename</th>
-            <th>Description</th>
-            <th>Match</th>
-            <th>Destination</th>
+            <th>Filename</th><th>Description</th><th>Match</th><th>Destination</th>
           </tr></thead>
           <tbody id="imgfilter-results-body"></tbody>
         </table>
       </div>
     </div>
+  </div>
 
+</div>
+
+<!-- FOLDER PICKER MODAL -->
+<div id="picker-overlay">
+  <div id="picker-modal">
+    <div id="picker-header">
+      <h2>📂 Select Folder</h2>
+      <button id="picker-up-btn">&#8593; Up</button>
+      <div id="picker-current-path">/home/bill</div>
+    </div>
+    <div id="picker-list">
+      <div id="picker-loading">Loading...</div>
+    </div>
+    <div id="picker-footer">
+      <div id="picker-selected-label">No folder selected</div>
+      <button id="picker-cancel-btn">Cancel</button>
+      <button id="picker-select-btn" disabled>Select This Folder</button>
+    </div>
   </div>
 </div>
 
-<!-- ===================== MODAL ===================== -->
+<!-- PROJECT MODAL -->
 <div id="modal-overlay">
   <div id="modal">
     <h2>Create New Project</h2>
@@ -1032,9 +802,9 @@
 // =========================================================
 // STATE
 // =========================================================
-let currentProject = null;
-let sessionIds = {};
-let currentOrgPlan = null;
+var currentProject = null;
+var sessionIds = {};
+var currentOrgPlan = null;
 
 function loadPref(key, fallback) {
   try { return localStorage.getItem(key) || fallback; } catch { return fallback; }
@@ -1043,43 +813,33 @@ function savePref(key, value) {
   try { localStorage.setItem(key, value); } catch {}
 }
 function getTopK() {
-  const val = parseInt(document.getElementById('top-k-input').value);
-  const final = parseInt(document.getElementById('top-k-final-input').value);
+  var val = parseInt(document.getElementById('top-k-input').value);
+  var final = parseInt(document.getElementById('top-k-final-input').value);
   if (isNaN(val) || val < 1) return 10;
-  if (val < final) {
-    alert('Candidates (top_k) must be greater than or equal to Chunks to agent (top_k_final).');
-    return null;
-  }
+  if (val < final) { alert('Candidates (top_k) must be >= Chunks to agent (top_k_final).'); return null; }
   return val;
 }
 function getTopKFinal() {
-  const val = parseInt(document.getElementById('top-k-final-input').value);
-  const topk = parseInt(document.getElementById('top-k-input').value);
+  var val = parseInt(document.getElementById('top-k-final-input').value);
+  var topk = parseInt(document.getElementById('top-k-input').value);
   if (isNaN(val) || val < 1) return 5;
-  if (val > topk) {
-    alert('Chunks to agent (top_k_final) must be less than or equal to Candidates (top_k).');
-    return null;
-  }
+  if (val > topk) { alert('Chunks to agent (top_k_final) must be <= Candidates (top_k).'); return null; }
   return val;
 }
 function getEmailMaxChars() {
-  const val = parseInt(document.getElementById('email-max-chars-input').value);
-  if (isNaN(val) || val < 100) return 600;
-  return val;
+  var val = parseInt(document.getElementById('email-max-chars-input').value);
+  return (isNaN(val) || val < 100) ? 600 : val;
 }
 function getDocMaxChars() {
-  const val = parseInt(document.getElementById('doc-max-chars-input').value);
-  if (isNaN(val) || val < 100) return 600;
-  return val;
+  var val = parseInt(document.getElementById('doc-max-chars-input').value);
+  return (isNaN(val) || val < 100) ? 600 : val;
 }
 function getHybridWeight() {
-  const val = parseInt(document.getElementById('hybrid-weight-input').value);
-  return val / 100.0;
+  return parseInt(document.getElementById('hybrid-weight-input').value) / 100.0;
 }
 function updateHybridLabel(val) {
-  const sem = parseInt(val);
-  const kw = 100 - sem;
-  document.getElementById('hybrid-weight-label').textContent = sem + '% sem / ' + kw + '% kw';
+  var sem = parseInt(val);
+  document.getElementById('hybrid-weight-label').textContent = sem + '% sem / ' + (100 - sem) + '% kw';
 }
 function loadSessionIds() {
   try { return JSON.parse(localStorage.getItem('sessionIds') || '{}'); } catch { return {}; }
@@ -1093,7 +853,7 @@ function saveSessionIds() {
 // =========================================================
 document.querySelectorAll('.tab-btn').forEach(function(btn) {
   btn.addEventListener('click', function() {
-    const target = this.dataset.tab;
+    var target = this.dataset.tab;
     document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
     document.querySelectorAll('.tab-panel').forEach(function(p) { p.classList.remove('active'); });
     this.classList.add('active');
@@ -1102,12 +862,118 @@ document.querySelectorAll('.tab-btn').forEach(function(btn) {
 });
 
 // =========================================================
-// ADVANCED PANEL TOGGLE
+// ADVANCED PANEL
 // =========================================================
 document.getElementById('btn-toggle-advanced').addEventListener('click', function() {
-  const bar = document.getElementById('advanced-bar');
-  bar.classList.toggle('open');
+  document.getElementById('advanced-bar').classList.toggle('open');
   this.classList.toggle('open');
+});
+
+// =========================================================
+// FOLDER PICKER
+// =========================================================
+var pickerTargetId = null;
+var pickerCurrentPath = '/home/bill';
+var pickerLastPath = '/home/bill';
+var pickerSelectedPath = null;
+
+function openPicker(targetInputId) {
+  pickerTargetId = targetInputId;
+  pickerSelectedPath = null;
+  document.getElementById('picker-select-btn').disabled = true;
+  document.getElementById('picker-selected-label').textContent = 'No folder selected';
+  document.getElementById('picker-overlay').classList.add('visible');
+  pickerNavigate(pickerLastPath);
+}
+
+function closePicker() {
+  document.getElementById('picker-overlay').classList.remove('visible');
+  pickerTargetId = null;
+}
+
+async function pickerNavigate(path) {
+  pickerCurrentPath = path;
+  document.getElementById('picker-current-path').textContent = path;
+  document.getElementById('picker-list').innerHTML = '<div id="picker-loading">Loading...</div>';
+
+  try {
+    var res = await fetch('/fs/browse?path=' + encodeURIComponent(path));
+    var data = await res.json();
+
+    if (!res.ok) {
+      document.getElementById('picker-list').innerHTML =
+        '<div id="picker-empty">Error: ' + escapeHtml(data.detail || 'Cannot read folder') + '</div>';
+      document.getElementById('picker-up-btn').disabled = true;
+      return;
+    }
+
+    document.getElementById('picker-up-btn').disabled = (!data.parent || data.parent === data.current);
+
+    var list = document.getElementById('picker-list');
+    if (data.dirs.length === 0) {
+      list.innerHTML = '<div id="picker-empty">No subfolders here</div>';
+    } else {
+      list.innerHTML = '';
+      data.dirs.forEach(function(name) {
+        var fullPath = data.current.replace(/\/$/, '') + '/' + name;
+        var item = document.createElement('div');
+        item.className = 'picker-item';
+        item.innerHTML = '<span class="picker-item-icon">📁</span>' + escapeHtml(name);
+        item.addEventListener('click', function() {
+          document.querySelectorAll('.picker-item').forEach(function(el) { el.classList.remove('selected'); });
+          item.classList.add('selected');
+          pickerSelectedPath = fullPath;
+          document.getElementById('picker-selected-label').textContent = fullPath;
+          document.getElementById('picker-select-btn').disabled = false;
+        });
+        item.addEventListener('dblclick', function() {
+          pickerLastPath = fullPath;
+          pickerNavigate(fullPath);
+        });
+        list.appendChild(item);
+      });
+    }
+
+    // Default: current directory is selectable
+    pickerSelectedPath = data.current;
+    document.getElementById('picker-selected-label').textContent = data.current;
+    document.getElementById('picker-select-btn').disabled = false;
+
+  } catch(e) {
+    document.getElementById('picker-list').innerHTML =
+      '<div id="picker-empty">Request failed: ' + escapeHtml(e.message) + '</div>';
+  }
+}
+
+document.getElementById('picker-up-btn').addEventListener('click', function() {
+  fetch('/fs/browse?path=' + encodeURIComponent(pickerCurrentPath))
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.parent && data.parent !== data.current) {
+        pickerLastPath = data.parent;
+        pickerNavigate(data.parent);
+      }
+    });
+});
+
+document.getElementById('picker-select-btn').addEventListener('click', function() {
+  if (pickerSelectedPath && pickerTargetId) {
+    document.getElementById(pickerTargetId).value = pickerSelectedPath;
+    pickerLastPath = pickerSelectedPath;
+  }
+  closePicker();
+});
+
+document.getElementById('picker-cancel-btn').addEventListener('click', closePicker);
+
+document.getElementById('picker-overlay').addEventListener('click', function(e) {
+  if (e.target === this) closePicker();
+});
+
+document.querySelectorAll('.btn-browse').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    openPicker(this.dataset.target);
+  });
 });
 
 // =========================================================
@@ -1124,46 +990,33 @@ async function init() {
 // =========================================================
 async function loadModels() {
   try {
-    const res = await fetch('/models');
-    const data = await res.json();
-    const models = data.models || [];
+    var res = await fetch('/models');
+    var data = await res.json();
+    var models = data.models || [];
 
-    const routerSel = document.getElementById('router-model-select');
-    const reasonSel = document.getElementById('reasoning-model-select');
+    var routerSel = document.getElementById('router-model-select');
+    var reasonSel = document.getElementById('reasoning-model-select');
 
-    routerSel.innerHTML = models.map(function(m) {
-      return '<option value="' + m + '">' + m + '</option>';
-    }).join('');
+    routerSel.innerHTML = models.map(function(m) { return '<option value="' + m + '">' + m + '</option>'; }).join('');
+    reasonSel.innerHTML = models.map(function(m) { return '<option value="' + m + '">' + m + '</option>'; }).join('');
 
-    reasonSel.innerHTML = models.map(function(m) {
-      return '<option value="' + m + '">' + m + '</option>';
-    }).join('');
-
-    const savedRouter = loadPref('router_model', 'gemma4:e4b');
-    const savedReason = loadPref('reasoning_model', 'gemma4:31b');
-
-    setSelectValue(routerSel, savedRouter);
-    setSelectValue(reasonSel, savedReason);
+    setSelectValue(routerSel, loadPref('router_model', 'gemma4:e4b'));
+    setSelectValue(reasonSel, loadPref('reasoning_model', 'gemma4:31b'));
 
     routerSel.addEventListener('change', function() { savePref('router_model', routerSel.value); });
     reasonSel.addEventListener('change', function() { savePref('reasoning_model', reasonSel.value); });
 
-    const visionSel = document.getElementById('imgfilter-vision-select');
-    visionSel.innerHTML = models.map(function(m) {
-      return '<option value="' + m + '">' + m + '</option>';
-    }).join('');
-    const savedVision = loadPref('vision_model', 'gemma4:e4b');
-    setSelectValue(visionSel, savedVision);
+    var visionSel = document.getElementById('imgfilter-vision-select');
+    visionSel.innerHTML = models.map(function(m) { return '<option value="' + m + '">' + m + '</option>'; }).join('');
+    setSelectValue(visionSel, loadPref('vision_model', 'gemma4:e4b'));
     visionSel.addEventListener('change', function() { savePref('vision_model', visionSel.value); });
 
-  } catch(e) {
-    console.error('Failed to load models:', e);
-  }
+  } catch(e) { console.error('Failed to load models:', e); }
 }
 
 function setSelectValue(sel, value) {
-  for (let opt of sel.options) {
-    if (opt.value === value) { sel.value = value; return; }
+  for (var i = 0; i < sel.options.length; i++) {
+    if (sel.options[i].value === value) { sel.value = value; return; }
   }
 }
 
@@ -1172,11 +1025,11 @@ function setSelectValue(sel, value) {
 // =========================================================
 async function loadProjects() {
   try {
-    const res = await fetch('/projects');
-    const data = await res.json();
-    const projects = data.projects || [];
+    var res = await fetch('/projects');
+    var data = await res.json();
+    var projects = data.projects || [];
+    var sel = document.getElementById('project-select');
 
-    const sel = document.getElementById('project-select');
     if (projects.length === 0) {
       sel.innerHTML = '<option value="">-- No projects --</option>';
       currentProject = null;
@@ -1188,28 +1041,25 @@ async function loadProjects() {
              p.name + (p.ready ? '' : ' (empty)') + '</option>';
     }).join('');
 
-    const saved = loadPref('selected_project', projects[0].name);
-    setSelectValue(sel, saved);
+    setSelectValue(sel, loadPref('selected_project', projects[0].name));
     currentProject = sel.value;
-
     await loadHistory(currentProject);
 
     sel.addEventListener('change', async function() {
-      const fromProject = currentProject;
-      const toProject = sel.value;
+      var fromProject = currentProject;
+      var toProject = sel.value;
       if (fromProject === toProject) return;
 
       try {
-        const syncRes = await fetch('/projects/sync_switch', {
+        var syncRes = await fetch('/projects/sync_switch', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({from_project: fromProject, to_project: toProject})
         });
         if (!syncRes.ok) {
-          const err = await syncRes.json();
+          var err = await syncRes.json();
           alert('Project switch blocked: ' + (err.detail || 'Drive sync failed.') +
-                '\n\nMount the ai-models drive and try again:\n' +
-                'sudo mount /dev/sda1 /mnt/ai-models');
+                '\n\nMount the ai-models drive and try again:\nsudo mount /dev/sda1 /mnt/ai-models');
           setSelectValue(sel, fromProject);
           return;
         }
@@ -1225,9 +1075,7 @@ async function loadProjects() {
       await loadHistory(currentProject);
     });
 
-  } catch(e) {
-    console.error('Failed to load projects:', e);
-  }
+  } catch(e) { console.error('Failed to load projects:', e); }
 }
 
 // =========================================================
@@ -1236,92 +1084,86 @@ async function loadProjects() {
 async function loadHistory(projectName) {
   if (!projectName) return;
   try {
-    const sessRes = await fetch('/history/' + projectName + '/sessions');
+    var sessRes = await fetch('/history/' + projectName + '/sessions');
     if (!sessRes.ok) return;
-    const sessData = await sessRes.json();
-    const sessions = sessData.sessions || [];
+    var sessData = await sessRes.json();
+    var sessions = sessData.sessions || [];
     if (sessions.length === 0) return;
 
-    const mostRecent = sessions[0];
-    const sessionId = mostRecent.session_id;
-
+    var sessionId = sessions[0].session_id;
     sessionIds[projectName] = sessionId;
     saveSessionIds();
 
-    const histRes = await fetch('/history/' + projectName + '/' + sessionId);
+    var histRes = await fetch('/history/' + projectName + '/' + sessionId);
     if (!histRes.ok) return;
-    const histData = await histRes.json();
-    const messages = histData.history || [];
+    var histData = await histRes.json();
+    var messages = histData.history || [];
     if (messages.length === 0) return;
 
-    const area = document.getElementById('chat-area');
-    const divider = document.createElement('div');
+    var area = document.getElementById('chat-area');
+    var divider = document.createElement('div');
     divider.className = 'history-divider';
     divider.textContent = 'Previous session';
     area.appendChild(divider);
 
-    for (const msg of messages) {
+    for (var i = 0; i < messages.length; i++) {
+      var msg = messages[i];
       if (msg.role === 'user') {
         appendMessage('user', msg.content, null, null, null);
       } else {
         appendMessage('assistant', msg.content, msg.intent, msg.sources, null);
       }
     }
-
     area.scrollTop = area.scrollHeight;
-  } catch(e) {
-    console.error('Failed to load history:', e);
-  }
+  } catch(e) { console.error('Failed to load history:', e); }
 }
 
 // =========================================================
-// CHAT RENDERING
+// CHAT
 // =========================================================
-function clearChat() {
-  document.getElementById('chat-area').innerHTML = '';
-}
+function clearChat() { document.getElementById('chat-area').innerHTML = ''; }
 
 function appendMessage(role, text, intent, sources, confidence) {
-  const area = document.getElementById('chat-area');
-  const div = document.createElement('div');
+  var area = document.getElementById('chat-area');
+  var div = document.createElement('div');
   div.className = 'message ' + role;
 
-  const meta = document.createElement('div');
+  var meta = document.createElement('div');
   meta.className = 'message-meta';
 
-  const roleLabel = document.createElement('span');
+  var roleLabel = document.createElement('span');
   roleLabel.className = 'role-label';
   roleLabel.textContent = role === 'user' ? 'You' : 'Assistant';
   meta.appendChild(roleLabel);
 
   if (intent) {
-    const badge = document.createElement('span');
+    var badge = document.createElement('span');
     badge.className = 'intent-badge intent-' + intent;
     badge.textContent = intent;
     meta.appendChild(badge);
   }
 
   if (confidence !== undefined && confidence !== null) {
-    const isLow = confidence <= 2;
-    const badge = document.createElement('span');
-    badge.className = 'confidence-badge ' + (isLow ? 'confidence-low' : 'confidence-ok');
-    badge.textContent = 'confidence ' + confidence + '/5';
-    meta.appendChild(badge);
+    var isLow = confidence <= 2;
+    var cbadge = document.createElement('span');
+    cbadge.className = 'confidence-badge ' + (isLow ? 'confidence-low' : 'confidence-ok');
+    cbadge.textContent = 'confidence ' + confidence + '/5';
+    meta.appendChild(cbadge);
   }
 
-  const bubble = document.createElement('div');
+  var bubble = document.createElement('div');
   bubble.className = 'bubble';
   bubble.innerHTML = formatText(text);
 
   if (confidence !== undefined && confidence !== null && confidence <= 2) {
-    const warn = document.createElement('span');
+    var warn = document.createElement('span');
     warn.className = 'confidence-warn-text';
     warn.textContent = '⚠ Low confidence — verify this answer against the source documents before acting.';
     bubble.appendChild(warn);
   }
 
   if (sources && sources.length > 0) {
-    const srcDiv = document.createElement('div');
+    var srcDiv = document.createElement('div');
     srcDiv.className = 'sources';
     srcDiv.innerHTML = '📎 ' + sources.map(function(s) { return '<span>' + s + '</span>'; }).join('');
     bubble.appendChild(srcDiv);
@@ -1345,12 +1187,9 @@ function formatText(text) {
     .replace(/\n/g, '<br>');
 }
 
-// =========================================================
-// SEND QUERY
-// =========================================================
 async function sendQuery() {
-  const input = document.getElementById('query-input');
-  const query = input.value.trim();
+  var input = document.getElementById('query-input');
+  var query = input.value.trim();
   if (!query || !currentProject) return;
 
   input.value = '';
@@ -1358,14 +1197,12 @@ async function sendQuery() {
   document.getElementById('btn-send').disabled = true;
 
   appendMessage('user', query, null, null, null);
-
-  const thinkingDiv = appendMessage('assistant', 'Thinking...', null, null, null);
+  var thinkingDiv = appendMessage('assistant', 'Thinking...', null, null, null);
   thinkingDiv.classList.add('thinking');
 
   try {
-    const sessionId = sessionIds[currentProject] || null;
-
-    const res = await fetch('/query', {
+    var sessionId = sessionIds[currentProject] || null;
+    var res = await fetch('/query', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({
@@ -1381,15 +1218,11 @@ async function sendQuery() {
         doc_max_chars: getDocMaxChars()
       })
     });
-
-    const data = await res.json();
-
+    var data = await res.json();
     sessionIds[currentProject] = data.session_id;
     saveSessionIds();
-
     thinkingDiv.remove();
     appendMessage('assistant', data.answer, data.intent, data.sources, data.confidence);
-
   } catch(e) {
     thinkingDiv.remove();
     appendMessage('assistant', 'Error: ' + e.message, null, null, null);
@@ -1403,34 +1236,24 @@ async function sendQuery() {
 // FILE UPLOAD
 // =========================================================
 document.getElementById('upload-input').addEventListener('change', async function() {
-  const files = Array.from(this.files);
+  var files = Array.from(this.files);
   if (!files.length || !currentProject) return;
+  var status = document.getElementById('upload-status');
+  var succeeded = 0, failed = 0;
 
-  const status = document.getElementById('upload-status');
-  let succeeded = 0;
-  let failed = 0;
-
-  for (const file of files) {
+  for (var i = 0; i < files.length; i++) {
+    var file = files[i];
     status.textContent = 'Uploading ' + file.name + '...';
     status.style.color = '#6b7280';
-
-    const form = new FormData();
+    var form = new FormData();
     form.append('project_name', currentProject);
     form.append('file', file);
-
     try {
-      const res = await fetch('/ingest', { method: 'POST', body: form });
-      const data = await res.json();
-      if (data.status === 'success' || data.status === 'ingested') {
-        succeeded++;
-      } else {
-        failed++;
-        console.warn('Failed: ' + file.name + ' — ' + data.message);
-      }
-    } catch(e) {
-      failed++;
-      console.warn('Error: ' + file.name + ' — ' + e.message);
-    }
+      var res = await fetch('/ingest', { method: 'POST', body: form });
+      var data = await res.json();
+      if (data.status === 'success' || data.status === 'ingested') { succeeded++; }
+      else { failed++; }
+    } catch(e) { failed++; }
   }
 
   if (failed === 0) {
@@ -1440,7 +1263,6 @@ document.getElementById('upload-input').addEventListener('change', async functio
     status.textContent = '✓ ' + succeeded + ' ingested, ✗ ' + failed + ' failed';
     status.style.color = '#f7c07e';
   }
-
   this.value = '';
   setTimeout(function() { status.textContent = ''; }, 6000);
 });
@@ -1449,53 +1271,35 @@ document.getElementById('upload-input').addEventListener('change', async functio
 // FOLDER INGEST
 // =========================================================
 document.getElementById('btn-ingest-folder').addEventListener('click', async function() {
-  const folderPath = document.getElementById('folder-path-input').value.trim();
-  const force = document.getElementById('force-reingest').checked;
-  const status = document.getElementById('folder-status');
+  var folderPath = document.getElementById('folder-path-input').value.trim();
+  var force = document.getElementById('force-reingest').checked;
+  var status = document.getElementById('folder-status');
 
-  if (!folderPath) {
-    status.textContent = 'Enter a folder path first.';
-    status.style.color = '#f77e7e';
-    return;
-  }
-
-  if (!currentProject) {
-    status.textContent = 'Select a project first.';
-    status.style.color = '#f77e7e';
-    return;
-  }
+  if (!folderPath) { status.textContent = 'Enter a folder path first.'; status.style.color = '#f77e7e'; return; }
+  if (!currentProject) { status.textContent = 'Select a project first.'; status.style.color = '#f77e7e'; return; }
 
   this.disabled = true;
   status.textContent = 'Scanning folder...';
   status.style.color = '#6b7280';
 
   try {
-    const res = await fetch('/ingest_folder', {
+    var res = await fetch('/ingest_folder', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({
-        project_name: currentProject,
-        folder_path: folderPath,
-        force: force
-      })
+      body: JSON.stringify({ project_name: currentProject, folder_path: folderPath, force: force })
     });
-
-    const data = await res.json();
-
+    var data = await res.json();
     if (!res.ok) {
       status.textContent = '✗ ' + (data.detail || 'Error');
       status.style.color = '#f77e7e';
     } else {
-      const parts = ['✓ ' + data.ingested + ' ingested'];
+      var parts = ['✓ ' + data.ingested + ' ingested'];
       if (data.skipped > 0) parts.push(data.skipped + ' skipped');
-      if (data.errors > 0)  parts.push(data.errors + ' errors');
+      if (data.errors > 0) parts.push(data.errors + ' errors');
       status.textContent = parts.join(', ');
       status.style.color = data.errors > 0 ? '#f7c07e' : '#7ef7b0';
     }
-  } catch(e) {
-    status.textContent = '✗ ' + e.message;
-    status.style.color = '#f77e7e';
-  }
+  } catch(e) { status.textContent = '✗ ' + e.message; status.style.color = '#f77e7e'; }
 
   this.disabled = false;
 });
@@ -1513,21 +1317,16 @@ function resetOrganizerResults() {
 }
 
 document.getElementById('org-instructions-toggle').addEventListener('click', function() {
-  const wrap = document.getElementById('org-instructions-wrap');
-  const isVisible = wrap.classList.contains('visible');
+  var wrap = document.getElementById('org-instructions-wrap');
+  var isVisible = wrap.classList.contains('visible');
   wrap.classList.toggle('visible');
   this.textContent = isVisible ? '+ Custom instructions' : '− Custom instructions';
 });
 
 document.getElementById('btn-classify').addEventListener('click', async function() {
-  const folderPath = document.getElementById('org-folder-path').value.trim();
-  const status = document.getElementById('org-status');
-
-  if (!folderPath) {
-    status.textContent = 'Enter a folder path first.';
-    status.style.color = '#f77e7e';
-    return;
-  }
+  var folderPath = document.getElementById('org-folder-path').value.trim();
+  var status = document.getElementById('org-status');
+  if (!folderPath) { status.textContent = 'Enter a folder path first.'; status.style.color = '#f77e7e'; return; }
 
   resetOrganizerResults();
   this.disabled = true;
@@ -1535,139 +1334,93 @@ document.getElementById('btn-classify').addEventListener('click', async function
   status.style.color = '#a08040';
 
   try {
-    const res = await fetch('/organize_folder', {
+    var res = await fetch('/organize_folder', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({
         folder_path: folderPath,
-        custom_instructions: document.getElementById('org-instructions').value.trim(),
+        custom_instructions: document.getElementById('org-instructions').value.trim()
       })
     });
+    var data = await res.json();
 
-    const data = await res.json();
-
-    if (!res.ok) {
-      status.textContent = '✗ ' + (data.detail || 'Error');
-      status.style.color = '#f77e7e';
-      this.disabled = false;
-      return;
-    }
-
-    if (data.total_files === 0) {
-      status.textContent = 'No files found in that folder.';
-      status.style.color = '#f7c07e';
-      this.disabled = false;
-      return;
-    }
+    if (!res.ok) { status.textContent = '✗ ' + (data.detail || 'Error'); status.style.color = '#f77e7e'; this.disabled = false; return; }
+    if (data.total_files === 0) { status.textContent = 'No files found in that folder.'; status.style.color = '#f7c07e'; this.disabled = false; return; }
 
     currentOrgPlan = data;
-
-    const tbody = document.getElementById('organizer-results-body');
+    var tbody = document.getElementById('organizer-results-body');
     tbody.innerHTML = '';
 
-    for (const move of (data.moves || [])) {
-      const tr = document.createElement('tr');
-      tr.innerHTML =
-        '<td>' + escapeHtml(move.filename) + '</td>' +
-        '<td class="cat-cell">' + escapeHtml(move.category) + '</td>' +
-        '<td>' + escapeHtml(move.destination) + '</td>';
+    (data.moves || []).forEach(function(move) {
+      var tr = document.createElement('tr');
+      tr.innerHTML = '<td>' + escapeHtml(move.filename) + '</td>' +
+                     '<td class="cat-cell">' + escapeHtml(move.category) + '</td>' +
+                     '<td>' + escapeHtml(move.destination) + '</td>';
       tbody.appendChild(tr);
-    }
+    });
 
-    for (const err of (data.errors || [])) {
-      const tr = document.createElement('tr');
+    (data.errors || []).forEach(function(err) {
+      var tr = document.createElement('tr');
       tr.className = 'error-row';
-      tr.innerHTML =
-        '<td>' + escapeHtml(err.filename) + '</td>' +
-        '<td class="cat-cell">ERROR</td>' +
-        '<td>' + escapeHtml(err.error) + '</td>';
+      tr.innerHTML = '<td>' + escapeHtml(err.filename) + '</td>' +
+                     '<td class="cat-cell">ERROR</td>' +
+                     '<td>' + escapeHtml(err.error) + '</td>';
       tbody.appendChild(tr);
-    }
+    });
 
     document.getElementById('organizer-results').classList.add('visible');
-
-    const errCount = (data.errors || []).length;
-    const moveCount = (data.moves || []).length;
-    status.textContent =
-      moveCount + ' file' + (moveCount !== 1 ? 's' : '') + ' classified into ' +
+    var errCount = (data.errors || []).length;
+    var moveCount = (data.moves || []).length;
+    status.textContent = moveCount + ' file' + (moveCount !== 1 ? 's' : '') + ' classified into ' +
       (data.categories || []).length + ' categories' +
       (errCount > 0 ? ', ' + errCount + ' error' + (errCount !== 1 ? 's' : '') : '') +
       ' — review above, then confirm.';
-    status.style.color = errCount > 0 ? '#f7c07e' : '#f7c07e';
+    status.style.color = '#f7c07e';
+    if (moveCount > 0) document.getElementById('btn-execute-plan').classList.add('ready');
 
-    if (moveCount > 0) {
-      document.getElementById('btn-execute-plan').classList.add('ready');
-    }
-
-  } catch(e) {
-    status.textContent = '✗ ' + e.message;
-    status.style.color = '#f77e7e';
-  }
-
+  } catch(e) { status.textContent = '✗ ' + e.message; status.style.color = '#f77e7e'; }
   this.disabled = false;
 });
 
 document.getElementById('btn-execute-plan').addEventListener('click', async function() {
   if (!currentOrgPlan) return;
+  var moveCount = (currentOrgPlan.moves || []).length;
+  if (!confirm('This will move ' + moveCount + ' file' + (moveCount !== 1 ? 's' : '') +
+               ' into subfolders.\n\nThis cannot be undone automatically.\n\nProceed?')) return;
 
-  const moveCount = (currentOrgPlan.moves || []).length;
-  const confirmed = confirm(
-    'This will move ' + moveCount + ' file' + (moveCount !== 1 ? 's' : '') + ' into subfolders.\n\n' +
-    'This cannot be undone automatically.\n\nProceed?'
-  );
-  if (!confirmed) return;
-
-  const status = document.getElementById('org-status');
+  var status = document.getElementById('org-status');
   this.disabled = true;
   status.textContent = 'Moving files…';
   status.style.color = '#a08040';
 
   try {
-    const res = await fetch('/organize_folder/execute', {
+    var res = await fetch('/organize_folder/execute', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({ plan: currentOrgPlan })
     });
-
-    const data = await res.json();
-
-    if (!res.ok) {
-      status.textContent = '✗ ' + (data.detail || 'Error during execution');
-      status.style.color = '#f77e7e';
-      this.disabled = false;
-      return;
-    }
-
-    const parts = ['✓ ' + data.moved + ' moved'];
+    var data = await res.json();
+    if (!res.ok) { status.textContent = '✗ ' + (data.detail || 'Error during execution'); status.style.color = '#f77e7e'; this.disabled = false; return; }
+    var parts = ['✓ ' + data.moved + ' moved'];
     if (data.skipped > 0) parts.push(data.skipped + ' skipped');
     if ((data.errors || []).length > 0) parts.push(data.errors.length + ' errors');
     status.textContent = parts.join(', ');
     status.style.color = (data.errors || []).length > 0 ? '#f7c07e' : '#7ef7b0';
-
     currentOrgPlan = null;
     this.classList.remove('ready');
-
-  } catch(e) {
-    status.textContent = '✗ ' + e.message;
-    status.style.color = '#f77e7e';
-    this.disabled = false;
-  }
+  } catch(e) { status.textContent = '✗ ' + e.message; status.style.color = '#f77e7e'; this.disabled = false; }
 });
 
 // =========================================================
 // IMAGE FILTER
 // =========================================================
 document.getElementById('btn-run-imgfilter').addEventListener('click', async function() {
-  const source = document.getElementById('imgfilter-source').value.trim();
-  const query  = document.getElementById('imgfilter-query').value.trim();
-  const dest   = document.getElementById('imgfilter-dest').value.trim();
-  const status = document.getElementById('imgfilter-status');
+  var source = document.getElementById('imgfilter-source').value.trim();
+  var query  = document.getElementById('imgfilter-query').value.trim();
+  var dest   = document.getElementById('imgfilter-dest').value.trim();
+  var status = document.getElementById('imgfilter-status');
 
-  if (!source || !query || !dest) {
-    status.textContent = 'Fill in all three fields first.';
-    status.style.color = '#f77e7e';
-    return;
-  }
+  if (!source || !query || !dest) { status.textContent = 'Fill in all three fields first.'; status.style.color = '#f77e7e'; return; }
 
   document.getElementById('imgfilter-results').classList.remove('visible');
   document.getElementById('imgfilter-results-body').innerHTML = '';
@@ -1676,137 +1429,70 @@ document.getElementById('btn-run-imgfilter').addEventListener('click', async fun
   status.style.color = '#7ecfa0';
 
   try {
-    const res = await fetch('/filter_images', {
+    var res = await fetch('/filter_images', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({
-        source_folder: source,
-        query: query,
-        destination_folder: dest,
-        vision_model: document.getElementById('imgfilter-vision-select').value || null,
+        source_folder: source, query: query, destination_folder: dest,
+        vision_model: document.getElementById('imgfilter-vision-select').value || null
       })
     });
+    var data = await res.json();
 
-    const data = await res.json();
+    if (!res.ok) { status.textContent = '✗ ' + (data.detail || 'Error'); status.style.color = '#f77e7e'; this.disabled = false; return; }
+    if (data.total_images === 0) { status.textContent = 'No image files found in that folder.'; status.style.color = '#f7c07e'; this.disabled = false; return; }
 
-    if (!res.ok) {
-      status.textContent = '✗ ' + (data.detail || 'Error');
-      status.style.color = '#f77e7e';
-      this.disabled = false;
-      return;
-    }
-
-    if (data.total_images === 0) {
-      status.textContent = 'No image files found in that folder.';
-      status.style.color = '#f7c07e';
-      this.disabled = false;
-      return;
-    }
-
-    const tbody = document.getElementById('imgfilter-results-body');
+    var tbody = document.getElementById('imgfilter-results-body');
     tbody.innerHTML = '';
-
-    for (const r of (data.results || [])) {
-      const tr = document.createElement('tr');
-      const matchCell = r.matched
-        ? '<td class="match-yes">✔ Yes</td>'
-        : '<td class="match-no">— No</td>';
-      const destCell = r.moved
-        ? '<td>' + escapeHtml(r.destination || '') + '</td>'
-        : '<td>—</td>';
-      tr.innerHTML =
-        '<td>' + escapeHtml(r.filename) + '</td>' +
-        '<td>' + escapeHtml(r.description || '') + '</td>' +
-        matchCell + destCell;
+    (data.results || []).forEach(function(r) {
+      var tr = document.createElement('tr');
+      tr.innerHTML = '<td>' + escapeHtml(r.filename) + '</td>' +
+                     '<td>' + escapeHtml(r.description || '') + '</td>' +
+                     (r.matched ? '<td class="match-yes">✔ Yes</td>' : '<td class="match-no">— No</td>') +
+                     (r.moved ? '<td>' + escapeHtml(r.destination || '') + '</td>' : '<td>—</td>');
       tbody.appendChild(tr);
-    }
-
-    for (const err of (data.errors || [])) {
-      const tr = document.createElement('tr');
+    });
+    (data.errors || []).forEach(function(err) {
+      var tr = document.createElement('tr');
       tr.className = 'error-row';
-      tr.innerHTML =
-        '<td>' + escapeHtml(err.filename) + '</td>' +
-        '<td colspan="3">' + escapeHtml(err.error) + '</td>';
+      tr.innerHTML = '<td>' + escapeHtml(err.filename) + '</td><td colspan="3">' + escapeHtml(err.error) + '</td>';
       tbody.appendChild(tr);
-    }
+    });
 
     document.getElementById('imgfilter-results').classList.add('visible');
-    status.textContent =
-      data.moved + ' image' + (data.moved !== 1 ? 's' : '') + ' moved to destination' +
+    status.textContent = data.moved + ' image' + (data.moved !== 1 ? 's' : '') + ' moved to destination' +
       ' (' + data.matched + ' matched out of ' + data.total_images + ' scanned)';
     status.style.color = '#7ecfa0';
-
-  } catch(err) {
-    status.textContent = '✗ Request failed: ' + err.message;
-    status.style.color = '#f77e7e';
-  }
-
+  } catch(err) { status.textContent = '✗ Request failed: ' + err.message; status.style.color = '#f77e7e'; }
   this.disabled = false;
 });
 
 // =========================================================
-// BACKUP BUTTON
+// BACKUP / DELETE
 // =========================================================
 document.getElementById('btn-backup-project').addEventListener('click', async function() {
-  if (!currentProject) {
-    alert('No project selected.');
-    return;
-  }
-  const btn = this;
+  if (!currentProject) { alert('No project selected.'); return; }
+  var btn = this;
   btn.disabled = true;
   btn.textContent = 'Backing up...';
   try {
-    const res = await fetch('/projects/' + encodeURIComponent(currentProject) + '/backup', {
-      method: 'POST'
-    });
-    const data = await res.json();
-    if (res.ok) {
-      alert('Backup complete: ' + (data.message || 'Workspace backed up to backup drive.'));
-    } else {
-      alert('Backup failed: ' + (data.detail || 'Unknown error.') +
-            '\n\nIs the backup drive mounted?\n' +
-            'sudo mount /dev/sdc1 /mnt/backup-drive');
-    }
-  } catch(e) {
-    alert('Backup error: ' + e.message);
-  } finally {
-    btn.disabled = false;
-    btn.textContent = '\uD83D\uDCBE Backup';
-  }
+    var res = await fetch('/projects/' + encodeURIComponent(currentProject) + '/backup', { method: 'POST' });
+    var data = await res.json();
+    if (res.ok) { alert('Backup complete: ' + (data.message || 'Workspace backed up to backup drive.')); }
+    else { alert('Backup failed: ' + (data.detail || 'Unknown error.') + '\n\nIs the backup drive mounted?\nsudo mount /dev/sdc1 /mnt/backup-drive'); }
+  } catch(e) { alert('Backup error: ' + e.message); }
+  finally { btn.disabled = false; btn.textContent = '\uD83D\uDCBE Backup'; }
 });
 
-// =========================================================
-// DELETE BUTTON
-// =========================================================
 document.getElementById('btn-delete-project').addEventListener('click', async function() {
-  if (!currentProject) {
-    alert('No project selected.');
-    return;
-  }
-  const confirmed = confirm(
-    'DELETE project "' + currentProject + '"?\n\n' +
-    'This will permanently remove the local workspace including\n' +
-    'all vectors, indexes, and chat history.\n\n' +
-    'Drive copies on ai-models are NOT deleted.\n\n' +
-    'This cannot be undone. Are you sure?'
-  );
-  if (!confirmed) return;
+  if (!currentProject) { alert('No project selected.'); return; }
+  if (!confirm('DELETE project "' + currentProject + '"?\n\nThis will permanently remove the local workspace including\nall vectors, indexes, and chat history.\n\nDrive copies on ai-models are NOT deleted.\n\nThis cannot be undone. Are you sure?')) return;
   try {
-    const res = await fetch('/projects/' + encodeURIComponent(currentProject), {
-      method: 'DELETE'
-    });
-    const data = await res.json();
-    if (res.ok) {
-      alert('Project deleted.');
-      currentProject = null;
-      clearChat();
-      await loadProjects();
-    } else {
-      alert('Delete failed: ' + (data.detail || 'Unknown error.'));
-    }
-  } catch(e) {
-    alert('Delete error: ' + e.message);
-  }
+    var res = await fetch('/projects/' + encodeURIComponent(currentProject), { method: 'DELETE' });
+    var data = await res.json();
+    if (res.ok) { alert('Project deleted.'); currentProject = null; clearChat(); await loadProjects(); }
+    else { alert('Delete failed: ' + (data.detail || 'Unknown error.')); }
+  } catch(e) { alert('Delete error: ' + e.message); }
 });
 
 // =========================================================
@@ -1824,25 +1510,22 @@ document.getElementById('modal-cancel').addEventListener('click', function() {
 });
 
 document.getElementById('modal-confirm').addEventListener('click', async function() {
-  const name = document.getElementById('modal-input').value.trim();
+  var name = document.getElementById('modal-input').value.trim();
   if (!name) return;
-
-  const statusEl = document.getElementById('modal-status');
+  var statusEl = document.getElementById('modal-status');
   statusEl.textContent = 'Creating...';
   statusEl.style.color = '#6b7280';
-
   try {
-    const res = await fetch('/projects', {
+    var res = await fetch('/projects', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({project_name: name})
     });
-    const data = await res.json();
-
+    var data = await res.json();
     if (res.ok) {
       document.getElementById('modal-overlay').classList.remove('visible');
       await loadProjects();
-      const sel = document.getElementById('project-select');
+      var sel = document.getElementById('project-select');
       setSelectValue(sel, data.name);
       currentProject = data.name;
       savePref('selected_project', currentProject);
@@ -1851,10 +1534,7 @@ document.getElementById('modal-confirm').addEventListener('click', async functio
       statusEl.textContent = data.detail || 'Error creating project.';
       statusEl.style.color = '#f77e7e';
     }
-  } catch(e) {
-    statusEl.textContent = e.message;
-    statusEl.style.color = '#f77e7e';
-  }
+  } catch(e) { statusEl.textContent = e.message; statusEl.style.color = '#f77e7e'; }
 });
 
 document.getElementById('modal-input').addEventListener('keydown', function(e) {
@@ -1863,25 +1543,20 @@ document.getElementById('modal-input').addEventListener('keydown', function(e) {
 });
 
 // =========================================================
-// TEXTAREA AUTO-RESIZE + ENTER TO SEND
+// TEXTAREA
 // =========================================================
-const textarea = document.getElementById('query-input');
+var textarea = document.getElementById('query-input');
 textarea.addEventListener('input', function() {
   this.style.height = 'auto';
   this.style.height = Math.min(this.scrollHeight, 160) + 'px';
 });
-
 textarea.addEventListener('keydown', function(e) {
-  if (e.key === 'Enter' && !e.shiftKey) {
-    e.preventDefault();
-    sendQuery();
-  }
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendQuery(); }
 });
-
 document.getElementById('btn-send').addEventListener('click', sendQuery);
 
 // =========================================================
-// ESCAPE HELPER
+// HELPERS
 // =========================================================
 function escapeHtml(str) {
   return String(str)
@@ -1891,9 +1566,6 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;');
 }
 
-// =========================================================
-// START
-// =========================================================
 init();
 </script>
 </body>
