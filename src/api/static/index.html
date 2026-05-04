@@ -424,16 +424,34 @@
   #tool-card-imgfilter { border-color: #2a4a34; }
   #tool-card-imgfilter h2 { color: #7ecfa0; }
 
+  /* Image filter field label */
+  .imgfilter-label {
+    font-size: 11px;
+    color: #5a8a6a;
+    white-space: nowrap;
+    min-width: 80px;
+  }
+
   .imgfilter-path-input {
+    flex: 1;
     background: #1a2a1e; color: #e0d6c2;
     border: 1px solid #2a4a34; border-radius: 4px;
-    padding: 6px 8px; font-size: 0.85rem; width: 220px; outline: none;
+    padding: 6px 8px; font-size: 0.85rem; outline: none;
+    font-family: 'Courier New', monospace;
+    min-width: 200px;
   }
+  .imgfilter-path-input:focus { border-color: #4a8a64; }
+  .imgfilter-path-input::placeholder { color: #3a5a44; }
+
   .imgfilter-query-input {
+    flex: 1;
     background: #1a2a1e; color: #e0d6c2;
     border: 1px solid #2a4a34; border-radius: 4px;
-    padding: 6px 8px; font-size: 0.85rem; width: 180px; outline: none;
+    padding: 6px 8px; font-size: 0.85rem; outline: none;
+    min-width: 200px;
   }
+  .imgfilter-query-input:focus { border-color: #4a8a64; }
+  .imgfilter-query-input::placeholder { color: #3a5a44; }
 
   #imgfilter-vision-select {
     background: #0d1f0d; color: #b0d4b0;
@@ -741,14 +759,24 @@
     <div class="tool-card" id="tool-card-imgfilter">
       <h2>🔍 Image Filter</h2>
       <div class="tool-row">
+        <span class="imgfilter-label">Source folder</span>
         <input type="text" id="imgfilter-source" class="imgfilter-path-input"
-               placeholder="Source folder path">
+               placeholder="/path/to/source/folder">
         <button class="btn-browse" data-target="imgfilter-source" title="Browse folders">📂</button>
+      </div>
+      <div class="tool-row">
+        <span class="imgfilter-label">Find images</span>
         <input type="text" id="imgfilter-query" class="imgfilter-query-input"
                placeholder="Find images matching…">
+      </div>
+      <div class="tool-row">
+        <span class="imgfilter-label">Destination</span>
         <input type="text" id="imgfilter-dest" class="imgfilter-path-input"
-               placeholder="Destination folder path">
+               placeholder="/path/to/destination/folder">
         <button class="btn-browse" data-target="imgfilter-dest" title="Browse folders">📂</button>
+      </div>
+      <div class="tool-row">
+        <span class="imgfilter-label">Vision model</span>
         <select id="imgfilter-vision-select" title="Vision model for image description"></select>
         <button id="btn-run-imgfilter">Find &amp; Move</button>
       </div>

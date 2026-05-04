@@ -16,6 +16,18 @@ Why gemma4:e4b for classification?
   Each file requires its own LLM call. The e4b model is fast and cheap
   per call — using the 31b model here would be extremely slow for large
   directories. Classification is a simple task; e4b is well-suited to it.
+
+Classification improvements (May 2026):
+  - num_predict raised from 20 to 200: e4b's thinking block consumes
+    tokens before the response — 20 tokens was too tight and caused
+    silent fallback to "Uncategorized".
+  - Structured JSON output: _classify_file() now requests {"category": "..."}
+    with format="json", eliminating preamble noise from the model.
+  - Category normalization pass: after all files are classified,
+    _normalize_categories() merges near-duplicate category names
+    (e.g. "SCADA Operations" and "Operations SCADA") into a canonical
+    list, then remaps all moves. Falls back to original categories
+    safely if the normalization call fails.
 """
 
 import re
@@ -216,6 +228,17 @@ def _classify_file(
       "prefer these categories: SCADA, CIP, Operations"
 
     Returns a plain string category name (e.g. "CIP Compliance").
+
+    Why num_predict=200?
+      A category name is 2-5 words (~10-30 tokens). e4b's internal
+      thinking block consumes tokens before the response appears.
+      The old value of 20 was too tight — it caused silent truncation
+      and fallback to "Uncategorized". 200 gives reliable headroom.
+
+    Why format="json"?
+      Asking for {"category": "..."} eliminates model preamble like
+      "Sure! The category for this file is:" which would corrupt the
+      raw string return. Mirrors the approach used in _image_matches_query().
     """
     base_url = OLLAMA.get("base_url", "http://localhost:11434")
     model = MODELS.get("router_llm", "gemma4:e4b")
@@ -271,8 +294,8 @@ def _classify_file(
         f"{instructions_block}"
         f"{cats_block}"
         f"{content_block}"
-        "Respond with ONLY the category name. "
-        "No explanation. No punctuation. No quotes. Just the category name."
+        "Respond with JSON only. No explanation.\n"
+        '{"category": "<your category name>"}'
     )
 
     try:
@@ -282,9 +305,10 @@ def _classify_file(
                 "model": model,
                 "prompt": prompt,
                 "stream": False,
+                "format": "json",
                 "options": {
                     "temperature": 0.0,
-                    "num_predict": 20,
+                    "num_predict": 200,
                 }
             },
             timeout=timeout
@@ -292,17 +316,132 @@ def _classify_file(
         response.raise_for_status()
         raw = response.json().get("response", "").strip()
 
-        # Clean up: strip quotes, newlines, extra whitespace
-        category = re.sub(r'["\'\n\r]', '', raw).strip()
+        # Parse the JSON response
+        try:
+            parsed = json.loads(raw)
+            category = parsed.get("category", "").strip()
+        except Exception:
+            # Regex fallback if JSON is malformed
+            m = re.search(r'"category"\s*:\s*"([^"]+)"', raw)
+            category = m.group(1).strip() if m else ""
+
+        # Final cleanup: strip quotes, newlines, extra whitespace
+        category = re.sub(r'["\'\n\r]', '', category).strip()
 
         # Sanity check
-        if not category or len(category) > 60 or category.count(' ') > 6:
+        _placeholders = {"your category name", "<your category name>",
+                         "new category", "category name", "new category name here",
+                         "your category name here"}
+        if (not category or len(category) > 60 or category.count(' ') > 6
+                or category.lower() in _placeholders):
+            print(f"[classify] WARNING: bad category for {filename!r}: {raw!r}", flush=True)
             return "Uncategorized"
 
         return category
 
-    except Exception:
+    except Exception as e:
+        print(f"[classify] ERROR on {filename!r}: {e}", flush=True)
         return "Uncategorized"
+
+
+# ── Category normalization ────────────────────────────────────────────────────
+
+def _normalize_categories(categories: list[str]) -> dict[str, str]:
+    """
+    Ask gemma4:e4b to merge near-duplicate category names into a canonical set.
+
+    Returns a mapping of {original_category: canonical_category}.
+    If only one category exists, or the LLM call fails, returns an identity
+    mapping (each category maps to itself) so the caller can always use
+    the return value safely.
+
+    Why a normalization pass?
+      Each file is classified independently. Without normalization, the model
+      may create "SCADA Operations" for file 1 and "Operations SCADA" for
+      file 12 — semantically identical but treated as different folders.
+      A single post-classification pass lets the model see the full picture
+      and consolidate near-duplicates before the plan is shown to the user.
+
+    Why a separate LLM call rather than doing this per-file?
+      Per-file normalization would require growing context every call.
+      A single batch call at the end is cheaper and more accurate because
+      the model sees all categories at once and can make globally consistent
+      decisions.
+    """
+    # Identity mapping — safe fallback if anything goes wrong
+    identity = {c: c for c in categories}
+
+    if len(categories) <= 1:
+        return identity
+
+    base_url = OLLAMA.get("base_url", "http://localhost:11434")
+    model = MODELS.get("router_llm", "gemma4:e4b")
+    timeout = OLLAMA.get("timeout_seconds", 3600)
+
+    cats_list = "\n".join(f"  - {c}" for c in categories)
+
+    prompt = (
+        "You are reviewing a list of folder category names produced by an AI file organizer.\n\n"
+        "Your job: identify near-duplicate categories that refer to the same topic "
+        "and merge them into one canonical name.\n\n"
+        "Rules:\n"
+        "- Only merge categories that are clearly the same topic with different wording.\n"
+        "- Do NOT merge categories that are genuinely different topics.\n"
+        "- Choose the most descriptive, title-case name as the canonical name.\n"
+        "- Every input category must appear exactly once in your output mapping.\n"
+        "- Return JSON only. No explanation.\n\n"
+        "Input categories:\n"
+        f"{cats_list}\n\n"
+        "Return a JSON object mapping each original category to its canonical name.\n"
+        "Example: {\"SCADA Ops\": \"SCADA Operations\", \"Operations SCADA\": \"SCADA Operations\"}\n"
+        "If a category needs no change, map it to itself.\n"
+        '{"' + categories[0] + '": "...", ...}'
+    )
+
+    try:
+        response = requests.post(
+            f"{base_url}/api/generate",
+            json={
+                "model": model,
+                "prompt": prompt,
+                "stream": False,
+                "format": "json",
+                "options": {
+                    "temperature": 0.0,
+                    "num_predict": 500,
+                }
+            },
+            timeout=timeout
+        )
+        response.raise_for_status()
+        raw = response.json().get("response", "").strip()
+
+        try:
+            mapping = json.loads(raw)
+        except Exception:
+            m = re.search(r"\{.*\}", raw, flags=re.DOTALL)
+            mapping = json.loads(m.group(0)) if m else None
+
+        if not mapping or not isinstance(mapping, dict):
+            print("[normalize] WARNING: could not parse normalization response — using original categories", flush=True)
+            return identity
+
+        # Validate: every original category must be in the mapping
+        result = {}
+        for cat in categories:
+            canonical = mapping.get(cat, "").strip()
+            if not canonical:
+                # Model missed this category — keep original
+                print(f"[normalize] WARNING: category {cat!r} missing from mapping — keeping original", flush=True)
+                result[cat] = cat
+            else:
+                result[cat] = canonical
+
+        return result
+
+    except Exception as e:
+        print(f"[normalize] ERROR during normalization: {e} — using original categories", flush=True)
+        return identity
 
 
 # ── Main classification pass ──────────────────────────────────────────────────
@@ -379,13 +518,11 @@ def classify_files(
             if category not in existing_categories:
                 existing_categories.append(category)
 
-            destination = folder / category / file_path.name
-
             moves.append({
                 "filename": file_path.name,
                 "source": str(file_path),
                 "category": category,
-                "destination": str(destination),
+                "destination": "",  # filled in after normalization
             })
 
         except Exception as e:
@@ -394,10 +531,25 @@ def classify_files(
                 "error": str(e)
             })
 
+    # ── Normalization pass ────────────────────────────────────────────────────
+    # After all files are classified, merge near-duplicate category names
+    # into a canonical set and rebuild destination paths.
+    if existing_categories:
+        mapping = _normalize_categories(existing_categories)
+        normalized_categories = sorted(set(mapping.values()))
+    else:
+        mapping = {}
+        normalized_categories = []
+
+    for move in moves:
+        canonical = mapping.get(move["category"], move["category"])
+        move["category"] = canonical
+        move["destination"] = str(folder / canonical / move["filename"])
+
     return {
         "folder": str(folder),
         "moves": moves,
-        "categories": sorted(existing_categories),
+        "categories": normalized_categories,
         "total_files": len(files),
         "errors": errors
     }
@@ -674,6 +826,7 @@ def filter_images(
             results.append(result_entry)
 
         except Exception as e:
+            print(f"[image_filter] ERROR on {file_path.name}: {e}", flush=True)
             errors.append({
                 "filename": file_path.name,
                 "error": str(e)
