@@ -124,7 +124,7 @@ def _extract_text(file_path: Path, max_chars: int = 2000) -> Optional[str]:
             return combined[:max_chars]
 
         # Images — use gemma4:e4b vision to describe content
-        if suffix in (".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"):
+        if suffix in (".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".avif"):
             return _describe_image(file_path)
 
         # Unknown type — fall through to filename-only classification
@@ -249,8 +249,8 @@ def _classify_file(
         cats_block = (
             "Categories already created:\n"
             + "\n".join(f"  - {c}" for c in existing_categories)
-            + "\n\nReuse one of these if the file fits. "
-              "Only create a new category if none apply.\n\n"
+            + "\n\nReuse one of these ONLY if it is a genuinely accurate fit. "
+              "If the file belongs to a different topic, create a new category.\n\n"
         )
     else:
         cats_block = "No categories yet — you will create the first one.\n\n"
@@ -619,7 +619,7 @@ def execute_plan(plan: dict) -> dict:
 
 # ── Image filter ──────────────────────────────────────────────────────────────
 
-IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"}
+IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".avif"}
 
 
 def _image_matches_query(description: str, query: str, file_path: Optional[Path] = None) -> bool:
