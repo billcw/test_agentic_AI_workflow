@@ -162,10 +162,23 @@ def _describe_image(file_path: Path, vision_model: Optional[str] = None) -> Opti
     timeout = OLLAMA.get("timeout_seconds", 3600)
 
     try:
-        image_data = base64.b64encode(file_path.read_bytes()).decode("utf-8")
+        suffix = file_path.suffix.lower()
+
+        # .avif is not supported by Ollama's vision API — convert to JPEG
+        # in memory using Pillow before encoding. This avoids writing any
+        # temp files to disk.
+        if suffix == ".avif":
+            import io
+            from PIL import Image as _PILImage
+            buf = io.BytesIO()
+            with _PILImage.open(file_path) as _img:
+                _img.convert("RGB").save(buf, format="JPEG", quality=85)
+            image_data = base64.b64encode(buf.getvalue()).decode("utf-8")
+            suffix = ".jpg"  # treat as JPEG for mime_map lookup below
+        else:
+            image_data = base64.b64encode(file_path.read_bytes()).decode("utf-8")
 
         # Determine MIME type for the prompt context
-        suffix = file_path.suffix.lower()
         mime_map = {
             ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
             ".png": "image/png", ".gif": "image/gif",
