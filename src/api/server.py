@@ -28,6 +28,13 @@ from src.projects.manager import (
     project_exists, delete_project
 )
 from src.tools.file_organizer import classify_files, execute_plan, filter_images
+from src.projects.archive_manager import (
+    get_project_status as get_workspace_status,
+    archive_project as do_archive,
+    restore_project as do_restore,
+    backup_project as do_backup,
+    delete_project as do_delete_tiered,
+)
 from src.projects.drive_sync import (
     sync_on_switch, save_workspace_to_primary,
     backup_workspace_to_backup_drive, list_drive_workspaces
@@ -96,6 +103,25 @@ class OrganizeFolderRequest(BaseModel):
 
 class ExecutePlanRequest(BaseModel):
     plan: dict
+class ArchiveProjectRequest(BaseModel):
+    project_name: str
+
+
+class RestoreProjectRequest(BaseModel):
+    project_name: str
+    from_tier: str  # "archived" or "backed_up"
+
+
+class BackupProjectRequest(BaseModel):
+    project_name: str
+
+
+class DeleteTieredProjectRequest(BaseModel):
+    project_name: str
+    tier: str           # "active", "archived", or "backed_up"
+    confirmed_name: str # must match project_name exactly
+
+
 class ImageFilterRequest(BaseModel):
     source_folder: str
     query: str
@@ -469,6 +495,94 @@ def drive_workspaces():
 
 
 # --- Project Management Endpoints ---
+
+@app.get("/projects/status")
+def project_status():
+    """
+    Return all known projects across active, archived, and backed-up tiers.
+    Used by the Project Manager panel in the Tools tab.
+    """
+    try:
+        return get_workspace_status()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/projects/archive")
+def archive_project_endpoint(request: ArchiveProjectRequest):
+    """
+    Move an active project to the archive tier on the external drive.
+    The project will no longer be queryable after this call.
+    """
+    try:
+        return do_archive(request.project_name)
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except (FileExistsError, ValueError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/projects/restore")
+def restore_project_endpoint(request: RestoreProjectRequest):
+    """
+    Restore a project from archive or backup tier to active.
+    Any currently active project is auto-archived first.
+    """
+    try:
+        return do_restore(request.project_name, request.from_tier)
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except (FileExistsError, ValueError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/projects/backup")
+def backup_project_endpoint(request: BackupProjectRequest):
+    """
+    Compress a project into a .tar.gz backup on the external drive.
+    Source project is not removed. Existing backup is overwritten.
+    """
+    try:
+        return do_backup(request.project_name)
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/projects/tiered")
+def delete_tiered_project_endpoint(request: DeleteTieredProjectRequest):
+    """
+    Permanently delete a project from a specific tier.
+    confirmed_name must exactly match project_name (server-side check).
+    """
+    try:
+        return do_delete_tiered(
+            request.project_name,
+            request.tier,
+            request.confirmed_name
+        )
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.get("/projects")
 def get_projects():

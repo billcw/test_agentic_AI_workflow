@@ -13,6 +13,8 @@ paths:
   models_root: "/mnt/external/ollama_models"             # Windows: "E:/OLLAMA_MODELS"
   tesseract_path: "/usr/bin/tesseract"                   # Windows: "C:/Program Files/Tesseract-OCR/tesseract.exe"
   temp_dir: "/tmp/doc_assistant"                         # Windows: "C:/Temp/doc_assistant"
+  archive_root: "/mnt/ai-models/archive"                # Uncompressed project archive
+  backup_root: "/mnt/ai-models/backups"                 # Compressed .tar.gz backups
 
 ollama:
   base_url: "http://localhost:11434"
