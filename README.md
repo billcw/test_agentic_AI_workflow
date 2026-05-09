@@ -73,7 +73,7 @@ If you are also learning — this codebase is meant to be readable by you.
 - 🖼️ **Vision Capability** — Submit photos or screenshots for live analysis using Gemma 4 native vision support.
 - 🌐 **Browser Interface** — A custom dark-themed three-tab web UI (Chat / Documents / Tools) accessible from any browser on your local network. No command line needed for end users.
 - 📂 **Folder Picker** — Every path input in the UI has a 📂 browse button that opens a live filesystem navigator — no more typing long paths by hand.
-- 🗄️ **Drive Sync** — Backup and restore project workspaces to an external drive with a single button click. Auto-saves on project switch.
+- 🗄️ **Three-Tier Workspace Management** — Archive projects to external drive (uncompressed), create compressed backups, and restore from either tier — all from the Project Manager panel in the Tools tab.
 - ⚙️ **One Config File** — Everything lives in a single `config.yaml`. Deploy on any OS or hardware by editing one file.
 
 ---
@@ -111,7 +111,7 @@ Analyzes emotional tone, urgency, and mood across emails and documents. Identifi
 
 ## Built-in Tools
 
-The Tools tab provides two standalone utilities that work on your local filesystem — independent of the chat agents and retrieval pipeline.
+The Tools tab provides three standalone utilities that work on your local filesystem — independent of the chat agents and retrieval pipeline.
 
 ### 🗂️ File Organizer
 
@@ -119,7 +119,7 @@ AI-driven file classification and sorting. Point it at a source folder, and the 
 
 **How it works:**
 
-1. Enter a source folder path and a destination root folder (use the 📂 browse button for both)
+1. Enter a source folder path (use the 📂 browse button)
 2. Click **Classify Files** — the system reads every file and asks `gemma4:e4b` where it belongs
 3. A dry-run table shows the proposed category and destination path for each file
 4. Review the plan, then click **Confirm & Move Files** to execute
@@ -127,7 +127,7 @@ AI-driven file classification and sorting. Point it at a source folder, and the 
 **Key behaviors:**
 
 - **Content-first classification** — The model reads the file body, not just the filename. A file named `report_final_v3_FINAL.docx` is classified by what's inside it.
-- **Vision classification for images** — Image files are described by the vision model before classification. The description feeds the classifier exactly like text content.
+- **Vision classification for images** — Image files (including `.avif`) are described by the vision model before classification. The description feeds the classifier exactly like text content.
 - **Safety check** — The organizer refuses any destination path inside the project directory. This is a hard block, not a warning.
 - **Custom instructions** — Expand the Custom Instructions panel to add free-text guidance that is injected into every classification prompt. Use this to enforce your own naming conventions or domain-specific categories.
 
@@ -139,7 +139,7 @@ Vision-based image search. Find images that match a description and move them to
 
 1. Enter a source folder path, a plain-language query describing what you're looking for, and a destination folder (use 📂 browse for all three)
 2. Select a vision model from the dropdown
-3. Click **Run Image Filter** — the system describes each image and evaluates whether it matches your query
+3. Click **Find & Move** — the system describes each image and evaluates whether it matches your query
 4. Matched images are moved to the destination folder immediately (no confirmation step)
 
 **How matching works — two stages:**
@@ -149,6 +149,36 @@ Vision-based image search. Find images that match a description and move them to
 **Stage 2 — Structured vision evaluation:** If Stage 1 passes, the model is called again with a structured JSON prompt asking it to return `{"match": true/false, "confidence": 0.0-1.0, "reason": "..."}`. A match requires both `match: true` AND `confidence >= 0.80`. This threshold prevents the model from calling something a match because a query word appeared incidentally in the description.
 
 This two-stage design dramatically reduces false positives compared to simple substring or any-word matching, while keeping unnecessary vision calls to a minimum.
+
+### 🗄️ Project Manager
+
+Three-tier workspace management for projects with large corpora that don't all fit on the internal drive simultaneously.
+
+**The three tiers:**
+
+| Tier | Location | State | Use |
+|------|----------|-------|-----|
+| **Active** | `workspaces/<project>/` | Uncompressed, queryable | Currently in use |
+| **Archived** | `/mnt/ai-models/archive/<project>/` | Uncompressed, not queryable | Fast swap — restore in seconds |
+| **Backed Up** | `/mnt/ai-models/backups/<project>.tar.gz` | Compressed | Long-term safety copy |
+
+A project can exist in multiple tiers simultaneously — for example, active AND backed up.
+
+**Operations:**
+
+- **Archive ↓** — Moves an active project to the external drive (uncompressed). Fast, cross-filesystem move using `shutil.move()`. Project is no longer queryable after archiving.
+- **Restore ↑** — Moves an archived project back to active, or extracts a backup tarball into the active workspace. If another project is currently active, it is auto-archived first. The original backup tarball is preserved after restore.
+- **Backup** — Compresses a project (from active or archived tier) into a `.tar.gz` on the external drive. Does not remove the source.
+- **Delete** — Permanently removes a project from a specific tier only. Deleting a backup does not affect the active or archived copy. Backup deletion requires typing the project name to confirm.
+
+**Safety rules enforced server-side:**
+
+- All paths are validated to be inside their expected tier root before any move or delete
+- `shutil.move()` is used instead of `os.rename()` — required for cross-filesystem moves (internal → external drive)
+- Tarball members are inspected before extraction to prevent path traversal
+- Delete confirmation is validated server-side — UI confirmation alone is not sufficient
+
+The panel remembers its open/closed state between page loads. Click **↻ Refresh** to reload status after operations complete.
 
 ---
 
@@ -198,8 +228,6 @@ Your Query
         Specialist Agent synthesizes answer with citations
                     |
         Confidence Check -- if score 1-2, retry with adjusted weight
-                    |
-        Critic Agent evaluates response quality
                     |
             Final answer delivered
 ```
@@ -297,7 +325,6 @@ The main conversational interface. Type a question and the full agent pipeline r
 - **Hybrid weight slider** — tune semantic vs. keyword balance (0-100%) per query
 - **Top-K / Top-K Final** inputs — control how many chunks are retrieved and passed to the agent
 - **Email chunk cap / Doc chunk cap** — limit how many characters per chunk reach the LLM, preventing context overflow on noisy email archives
-- **Custom instructions** — free-text guidance injected into every agent prompt for that query
 
 ### Tab 2 — Documents
 
@@ -312,6 +339,7 @@ Standalone filesystem utilities:
 
 - **File Organizer** — AI-driven classification and sorting (see Built-in Tools above)
 - **Image Filter** — Vision-based image search and move (see Built-in Tools above)
+- **Project Manager** — Three-tier workspace management: archive, backup, restore, delete (see Built-in Tools above)
 
 ### Folder Picker
 
@@ -341,7 +369,7 @@ local-ai-doc-assistant/
 │   ├── retrieval/          ← hybrid search, MMR, multi-turn, re-ranker
 │   ├── agents/             ← five LangGraph agents + orchestrator
 │   ├── memory/             ← per-project chat history
-│   ├── projects/           ← workspace manager + drive sync
+│   ├── projects/           ← workspace manager, drive sync, archive manager
 │   ├── tools/              ← file organizer + image filter
 │   └── api/                ← FastAPI backend + custom web UI
 ├── workspaces/             ← YOUR data (gitignored)
@@ -379,15 +407,16 @@ local-ai-doc-assistant/
 | agentic-v2 | Hybrid weight slider wired through full pipeline | ✅ Complete |
 | agentic-v2 | UI-controllable chunk caps — email and document | ✅ Complete |
 | agentic-v2 | MSG email file support via extract-msg | ✅ Complete |
-| agentic-v2 | Critic agent — response evaluation framework | 🔄 In Progress |
 | Post-merge | AI-driven file organizer with dry-run workflow | ✅ Complete |
-| Post-merge | Vision classification for image files | ✅ Complete |
+| Post-merge | Vision classification for image files (.avif support) | ✅ Complete |
 | Post-merge | Custom instructions for file organizer | ✅ Complete |
 | Post-merge | Image Filter — vision-based image search and move | ✅ Complete |
-| Post-merge | Drive sync — backup/restore workspaces to external drive | ✅ Complete |
 | Post-merge | Three-tab UI — Chat / Documents / Tools | ✅ Complete |
 | Post-merge | Folder picker — 📂 browse button on all path inputs | ✅ Complete |
 | Post-merge | Image filter matching — structured JSON + confidence threshold | ✅ Complete |
+| Post-merge | Classifier prompt fix — accurate category creation | ✅ Complete |
+| workspace-mgmt | Three-tier workspace manager (archive/backup/restore) | ✅ Complete |
+| workspace-mgmt | Project Manager UI panel in Tools tab | ✅ Complete |
 
 ---
 
@@ -415,6 +444,8 @@ paths:
   documents_root:  "/path/to/your/documents"
   tesseract_path:  "/usr/bin/tesseract"
   temp_dir:        "/tmp/local-ai-doc-assistant"
+  archive_root:    "/mnt/ai-models/archive"   # uncompressed project archive
+  backup_root:     "/mnt/ai-models/backups"   # compressed .tar.gz backups
 
 ollama:
   base_url:         "http://localhost:11434"
@@ -451,6 +482,9 @@ interface:
 - **Corrupt OST files** — Corrupt or partial OST archives will fail silently during ingestion. PST files are more reliably handled by libpff.
 - **num_predict tuning** — 3000 tokens is tuned for the reference hardware. Increasing this on systems with insufficient VRAM will cause the 31B model to fall back to CPU.
 - **File Organizer safety check** — The organizer hard-blocks any destination path inside the project directory. Verify destination paths are outside the project root before running.
+- **Archive while querying** — ChromaDB does not hold persistent open handles between requests. However, avoid archiving a project while a query is actively running against it.
+- **External drive required for archive/backup** — The Project Manager checks that `archive_root` and `backup_root` are reachable before any operation. If the external drive is not mounted, a clear error is returned and no operation proceeds.
+- **Cross-filesystem moves** — `shutil.move()` is used throughout the archive manager. `os.rename()` does not work across filesystem boundaries (internal NVMe → external USB drive) and is never used.
 
 ---
 
