@@ -53,7 +53,7 @@ CRITICAL RULES — violating these is worse than giving no answer:
    Where X reflects how completely the excerpts support your answer (not your general knowledge)."""
 
 
-def _clean_chunk_text(text: str, max_chars: int = 600) -> str:
+def _clean_chunk_text(text: str, max_chars: int = 600, is_email: bool = False) -> str:
     """
     Clean a single chunk's text before feeding it to the LLM.
 
@@ -94,17 +94,19 @@ def _clean_chunk_text(text: str, max_chars: int = 600) -> str:
     # Remove bare mailto: references without angle brackets
     text = re.sub(r'mailto:\S+', '', text)
 
-    # Remove lines that are pure encoded noise — lines with no spaces
-    # and longer than 40 characters are almost always base64/token garbage
-    lines = text.split('\n')
-    cleaned_lines = []
-    for line in lines:
-        stripped = line.strip()
-        # Keep the line if it has spaces (real text) or is short
-        if ' ' in stripped or len(stripped) <= 40:
-            cleaned_lines.append(line)
-        # Otherwise it's likely an encoded token — skip it
-    text = '\n'.join(cleaned_lines)
+    # Remove lines that are pure encoded noise — only for email chunks.
+    # PDF/document text does not contain base64 garbage and the
+    # no-spaces heuristic incorrectly strips technical terms and table data.
+    if is_email:
+        lines = text.split('\n')
+        cleaned_lines = []
+        for line in lines:
+            stripped = line.strip()
+            # Keep the line if it has spaces (real text) or is short
+            if ' ' in stripped or len(stripped) <= 40:
+                cleaned_lines.append(line)
+            # Otherwise it's likely an encoded token — skip it
+        text = '\n'.join(cleaned_lines)
 
     # Collapse runs of 3+ blank lines down to a single blank line
     text = re.sub(r'\n{3,}', '\n\n', text)
@@ -125,7 +127,7 @@ def _clean_chunk_text(text: str, max_chars: int = 600) -> str:
 
 def build_context(chunks: list[dict],
                   email_max_chars: int = 600,
-                  doc_max_chars: int = 600) -> str:
+                  doc_max_chars: int = 1500) -> str:
     """
     Format retrieved chunks into a context block for the LLM prompt.
     Each chunk is labeled with its source so the model can cite it.
@@ -151,14 +153,20 @@ def build_context(chunks: list[dict],
         text = chunk.get("text", "")
         method = chunk.get("method", "digital")
 
-        # Choose cap based on chunk type — email chunks tend to be
-        # noisier so they may warrant a different cap than clean PDFs
-        if method == "email":
+        # Detect email chunks by source file extension.
+        # method field is not returned by semantic_search so we
+        # key off the filename instead.
+        import os
+        EMAIL_EXTENSIONS = {'.pst', '.ost', '.msg', '.eml', '.txt'}
+        ext = os.path.splitext(source)[1].lower()
+        is_email = ext in EMAIL_EXTENSIONS
+
+        if is_email:
             cap = email_max_chars
         else:
             cap = doc_max_chars
 
-        cleaned = _clean_chunk_text(text, max_chars=cap)
+        cleaned = _clean_chunk_text(text, max_chars=cap, is_email=is_email)
 
         if not cleaned or len(cleaned) < 20:
             skipped += 1
