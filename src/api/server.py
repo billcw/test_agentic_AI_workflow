@@ -8,7 +8,7 @@ To run the server:
 import uuid
 import requests as http_requests
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
@@ -84,6 +84,8 @@ class QueryResponse(BaseModel):
     chunks_used: int
     confidence: int
     session_id: str
+    needs_clarification: bool = False
+    clarifying_questions: List[str] = []
 
 
 class CreateProjectRequest(BaseModel):
@@ -103,6 +105,7 @@ class OrganizeFolderRequest(BaseModel):
 
 class ExecutePlanRequest(BaseModel):
     plan: dict
+
 class ArchiveProjectRequest(BaseModel):
     project_name: str
 
@@ -231,6 +234,11 @@ def query(request: QueryRequest):
     """
     Main query endpoint. Routes the user's message through the full
     agentic pipeline and returns the answer with citations.
+
+    When the clarifier determines the query is ambiguous, returns early
+    with needs_clarification=True and clarifying_questions=[...].
+    No chat history is saved in this case — the turn is only saved
+    after the user provides answers and a full answer is returned.
     """
     if not project_exists(request.project_name):
         raise HTTPException(
@@ -257,14 +265,17 @@ def query(request: QueryRequest):
         doc_max_chars=request.doc_max_chars
     )
 
-    save_turn(
-        project_name=request.project_name,
-        session_id=session_id,
-        user_message=request.query,
-        assistant_reply=result["answer"],
-        intent=result["intent"],
-        sources=result["sources"]
-    )
+    # Only save to chat history when we have a real answer.
+    # If we're returning clarifying questions, the turn is not complete yet.
+    if not result.get("needs_clarification", False):
+        save_turn(
+            project_name=request.project_name,
+            session_id=session_id,
+            user_message=request.query,
+            assistant_reply=result["answer"],
+            intent=result["intent"],
+            sources=result["sources"]
+        )
 
     return QueryResponse(
         answer=result["answer"],
@@ -272,7 +283,9 @@ def query(request: QueryRequest):
         sources=result["sources"],
         chunks_used=result["chunks_used"],
         confidence=result.get("confidence", 3),
-        session_id=session_id
+        session_id=session_id,
+        needs_clarification=result.get("needs_clarification", False),
+        clarifying_questions=result.get("clarifying_questions", [])
     )
 
 
@@ -373,11 +386,7 @@ def organize_folder(request: OrganizeFolderRequest):
 
     This endpoint NEVER moves files. It only returns the proposed plan.
     The UI shows the plan to the user, who must confirm before execution.
-
-
     """
-
-
     try:
         plan = classify_files(
             folder_path=request.folder_path,

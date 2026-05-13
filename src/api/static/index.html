@@ -730,6 +730,41 @@
   .pm-delete-confirm input:focus { border-color: #8e3030; }
   .pm-delete-confirm-btns { display: flex; gap: 6px; margin-top: 6px; }
 
+  /* --- Clarifying Questions Card --- */
+  .clarify-card {
+    background: #161d2e;
+    border: 1px solid #2d4a6e;
+    border-radius: 4px 12px 12px 12px;
+    padding: 14px 16px;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  .clarify-card .clarify-label {
+    font-size: 11px; font-weight: 600; color: #4f7ef7;
+    text-transform: uppercase; letter-spacing: 0.05em;
+    margin-bottom: 10px;
+  }
+  .clarify-card ol {
+    margin: 0 0 12px 18px; padding: 0; color: #c8d8f0;
+  }
+  .clarify-card ol li { margin-bottom: 6px; }
+  .clarify-card .clarify-input {
+    width: 100%;
+    background: #1e2a3e; color: #ececec;
+    border: 1px solid #2d4a6e; border-radius: 6px;
+    padding: 8px 10px; font-size: 13px;
+    font-family: inherit; resize: vertical;
+    min-height: 60px; outline: none; margin-bottom: 8px;
+    box-sizing: border-box;
+  }
+  .clarify-card .clarify-input:focus { border-color: #4f7ef7; }
+  .clarify-card .clarify-submit {
+    background: #4f7ef7; border-color: #4f7ef7; color: white;
+    padding: 7px 18px; font-size: 13px; border-radius: 6px; cursor: pointer;
+  }
+  .clarify-card .clarify-submit:hover { background: #3d6de0; }
+  .clarify-card .clarify-submit:disabled { background: #2a3044; border-color: #2a3044; color: #4f5a6b; cursor: not-allowed; }
+
   ::-webkit-scrollbar { width: 6px; }
   ::-webkit-scrollbar-track { background: #0f1117; }
   ::-webkit-scrollbar-thumb { background: #2a2f3e; border-radius: 3px; }
@@ -1364,7 +1399,19 @@ async function sendQuery() {
     sessionIds[currentProject] = data.session_id;
     saveSessionIds();
     thinkingDiv.remove();
-    appendMessage('assistant', data.answer, data.intent, data.sources, data.confidence);
+
+    // --- Clarifying questions path ---
+    // The server decided it needs more context before searching.
+    // Render a card with the questions and a text box for the user
+    // to answer them. On submit, we send a new enriched query:
+    //   original query + newline + 'Answers: ' + user answers
+    // The clarifier will pass through on the second call because
+    // the enriched query is specific enough.
+    if (data.needs_clarification && data.clarifying_questions && data.clarifying_questions.length > 0) {
+      appendClarifyCard(query, data.clarifying_questions, data.session_id);
+    } else {
+      appendMessage('assistant', data.answer, data.intent, data.sources, data.confidence);
+    }
   } catch(e) {
     thinkingDiv.remove();
     appendMessage('assistant', 'Error: ' + e.message, null, null, null);
@@ -1372,6 +1419,118 @@ async function sendQuery() {
 
   document.getElementById('btn-send').disabled = false;
   input.focus();
+}
+
+function appendClarifyCard(originalQuery, questions, sessionId) {
+  // Build the questions card inline in the chat area.
+  // Looks like an assistant bubble but contains a form.
+  var area = document.getElementById('chat-area');
+  var div = document.createElement('div');
+  div.className = 'message assistant';
+
+  var meta = document.createElement('div');
+  meta.className = 'message-meta';
+  var roleLabel = document.createElement('span');
+  roleLabel.className = 'role-label';
+  roleLabel.textContent = 'Assistant';
+  var clarifyBadge = document.createElement('span');
+  clarifyBadge.className = 'intent-badge intent-lookup';
+  clarifyBadge.textContent = 'clarifying';
+  meta.appendChild(roleLabel);
+  meta.appendChild(clarifyBadge);
+
+  var card = document.createElement('div');
+  card.className = 'clarify-card';
+
+  var label = document.createElement('div');
+  label.className = 'clarify-label';
+  label.textContent = 'A few questions to help me search better:';
+  card.appendChild(label);
+
+  var ol = document.createElement('ol');
+  questions.forEach(function(q) {
+    var li = document.createElement('li');
+    li.textContent = q;
+    ol.appendChild(li);
+  });
+  card.appendChild(ol);
+
+  var textarea = document.createElement('textarea');
+  textarea.className = 'clarify-input';
+  textarea.placeholder = 'Type your answers here...';
+  card.appendChild(textarea);
+
+  var submitBtn = document.createElement('button');
+  submitBtn.className = 'clarify-submit';
+  submitBtn.textContent = 'Submit Answers';
+  card.appendChild(submitBtn);
+
+  div.appendChild(meta);
+  div.appendChild(card);
+  area.appendChild(div);
+  area.scrollTop = area.scrollHeight;
+  textarea.focus();
+
+  // On submit: build enriched query, disable card, send as new query
+  async function submitAnswers() {
+    var answers = textarea.value.trim();
+    if (!answers) return;
+    submitBtn.disabled = true;
+    textarea.disabled = true;
+    submitBtn.textContent = 'Searching...';
+
+    // Compose the enriched query the pipeline will see
+    var enrichedQuery = originalQuery + '\n\nAnswers to clarifying questions: ' + answers;
+
+    // Show the user's answers as a user bubble
+    appendMessage('user', answers, null, null, null);
+    var thinkingDiv2 = appendMessage('assistant', 'Thinking...', null, null, null);
+    thinkingDiv2.classList.add('thinking');
+
+    try {
+      var res2 = await fetch('/query', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          project_name: currentProject,
+          query: enrichedQuery,
+          session_id: sessionId,
+          router_model: document.getElementById('router-model-select').value || null,
+          reasoning_model: document.getElementById('reasoning-model-select').value || null,
+          top_k: getTopK(),
+          top_k_final: getTopKFinal(),
+          hybrid_weight: getHybridWeight(),
+          email_max_chars: getEmailMaxChars(),
+          doc_max_chars: getDocMaxChars()
+        })
+      });
+      var data2 = await res2.json();
+      sessionIds[currentProject] = data2.session_id;
+      saveSessionIds();
+      thinkingDiv2.remove();
+      // If clarifier fires again (rare), show questions again; otherwise show answer
+      if (data2.needs_clarification && data2.clarifying_questions && data2.clarifying_questions.length > 0) {
+        appendClarifyCard(enrichedQuery, data2.clarifying_questions, data2.session_id);
+      } else {
+        appendMessage('assistant', data2.answer, data2.intent, data2.sources, data2.confidence);
+      }
+    } catch(e) {
+      thinkingDiv2.remove();
+      appendMessage('assistant', 'Error: ' + e.message, null, null, null);
+      submitBtn.disabled = false;
+      textarea.disabled = false;
+      submitBtn.textContent = 'Submit Answers';
+    }
+  }
+
+  submitBtn.addEventListener('click', submitAnswers);
+  textarea.addEventListener('keydown', function(e) {
+    // Ctrl+Enter or Cmd+Enter submits, plain Enter adds newline
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      submitAnswers();
+    }
+  });
 }
 
 // =========================================================

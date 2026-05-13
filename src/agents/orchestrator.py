@@ -2,21 +2,30 @@
 orchestrator.py - LangGraph workflow orchestrator.
 
 This is the single entry point for the entire agentic system.
-It wires together: Router -> Retrieval -> specialist agent -> Refinement -> Critic -> END.
+It wires together: Router -> Clarifier -> Retrieval -> specialist agent -> Refinement -> Critic -> END.
 
 How LangGraph works here (simple analogy):
 Think of it as a flowchart with named states. Each state is a function
 that does some work and returns the name of the next state to go to.
 The graph defines which states exist and which transitions are allowed.
 
-Our graph (agentic-v2):
-  START -> router -> retrieval -> [teach|troubleshoot|check|sentiment|lookup]
+Our graph:
+  START -> router -> clarifier -> [END_with_questions | retrieval]
+       -> [teach|troubleshoot|check|sentiment|lookup]
        -> refinement -> critic -> END
+
+Clarifying questions flow:
+  If the clarifier decides the query is ambiguous, the pipeline exits
+  early and returns needs_clarification=True with the questions list.
+  The UI renders the questions, collects user answers, and re-submits
+  a new enriched query. On the second call the clarifier passes through
+  because the enriched query is specific enough.
 """
 
 from typing import TypedDict
 from langgraph.graph import StateGraph, END
 from src.agents.router import classify_intent, classify_scope
+from src.agents.clarifier import clarify
 from src.agents.teacher import teach
 from src.agents.troubleshooter import troubleshoot
 from src.agents.checker import check
@@ -49,6 +58,8 @@ class AgentState(TypedDict):
     scope: str
     email_max_chars: int
     doc_max_chars: int
+    needs_clarification: bool
+    clarifying_questions: list
 
 
 # --- Node Functions ---
@@ -59,6 +70,35 @@ def router_node(state: AgentState) -> dict:
     intent = classify_intent(state["query"], model=state.get("router_model"))
     scope = classify_scope(state["query"], model=state.get("router_model"))
     return {"intent": intent, "scope": scope}
+
+
+def clarifier_node(state: AgentState) -> dict:
+    """
+    Check whether the query is too ambiguous to retrieve good results.
+
+    If ambiguous: sets needs_clarification=True and clarifying_questions=[...].
+    The conditional edge after this node will route to END immediately,
+    returning the questions to the UI without running retrieval.
+
+    If not ambiguous: sets needs_clarification=False and the pipeline
+    continues normally to retrieval. Zero latency cost on clear queries
+    beyond the fast e4b classification call.
+
+    Fail-open: any error in the clarifier returns needs_clarification=False
+    so the pipeline always proceeds even if this step errors.
+    """
+    print(f"  [Clarifier] Checking query ambiguity...")
+    result = clarify(state["query"], model=state.get("router_model"))
+    needs = result["needs_clarification"]
+    questions = result["clarifying_questions"]
+    if needs:
+        print(f"  [Clarifier] Ambiguous — returning {len(questions)} questions to UI")
+    else:
+        print(f"  [Clarifier] Clear — proceeding to retrieval")
+    return {
+        "needs_clarification": needs,
+        "clarifying_questions": questions
+    }
 
 
 def retrieval_node(state: AgentState) -> dict:
@@ -311,6 +351,17 @@ def critic_node(state: AgentState) -> dict:
     }
 
 
+def route_after_clarifier(state: AgentState) -> str:
+    """
+    Conditional edge after clarifier_node.
+    If the query needs clarification: exit immediately (return questions to UI).
+    If the query is clear: proceed to retrieval as normal.
+    """
+    if state.get("needs_clarification", False):
+        return "end_early"
+    return "retrieval"
+
+
 def route_to_agent(state: AgentState) -> str:
     """Conditional edge — routes to specialist node based on intent."""
     intent = state.get("intent", "lookup")
@@ -329,11 +380,12 @@ def route_to_agent(state: AgentState) -> str:
 def build_graph():
     """
     Construct and compile the LangGraph workflow.
-    Flow: router -> retrieval -> specialist -> refinement -> critic -> END
+    Flow: router -> clarifier -> [END (questions) | retrieval -> specialist -> refinement -> critic -> END]
     """
     graph = StateGraph(AgentState)
 
     graph.add_node("router", router_node)
+    graph.add_node("clarifier", clarifier_node)
     graph.add_node("retrieval", retrieval_node)
     graph.add_node("teach", teach_node)
     graph.add_node("troubleshoot", troubleshoot_node)
@@ -344,7 +396,17 @@ def build_graph():
     graph.add_node("critic", critic_node)
 
     graph.set_entry_point("router")
-    graph.add_edge("router", "retrieval")
+    graph.add_edge("router", "clarifier")
+
+    # After clarifier: either exit early with questions, or continue to retrieval
+    graph.add_conditional_edges(
+        "clarifier",
+        route_after_clarifier,
+        {
+            "end_early": END,
+            "retrieval": "retrieval",
+        }
+    )
 
     graph.add_conditional_edges(
         "retrieval",
@@ -386,8 +448,14 @@ def run_agent(project_name: str, query: str,
               doc_max_chars: int = None) -> dict:
     """
     Run the full agentic pipeline for a user query.
+
     Returns answer, intent, sources, chunks_used, confidence,
     second_pass_fired, critic_verdict, critic_feedback.
+
+    When the clarifier fires, returns early with:
+        needs_clarification=True
+        clarifying_questions=[list of question strings]
+        answer="" (no answer yet)
     """
     initial_state = AgentState(
         project_name=project_name,
@@ -410,7 +478,9 @@ def run_agent(project_name: str, query: str,
         refinement_attempted=False,
         scope="all",
         email_max_chars=email_max_chars or 0,
-        doc_max_chars=doc_max_chars or 0
+        doc_max_chars=doc_max_chars or 0,
+        needs_clarification=False,
+        clarifying_questions=[]
     )
 
     final_state = agent_graph.invoke(initial_state)
@@ -423,5 +493,7 @@ def run_agent(project_name: str, query: str,
         "confidence": final_state.get("confidence", 3),
         "second_pass_fired": final_state.get("second_pass_fired", False),
         "critic_verdict": final_state.get("critic_verdict", ""),
-        "critic_feedback": final_state.get("critic_feedback", "")
+        "critic_feedback": final_state.get("critic_feedback", ""),
+        "needs_clarification": final_state.get("needs_clarification", False),
+        "clarifying_questions": final_state.get("clarifying_questions", [])
     }
