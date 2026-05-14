@@ -17,6 +17,8 @@ EXTENSION_MAP = {
     # Outlook archive files
     ".pst": "pst",
     ".ost": "pst",
+    # MBOX email archives (Gmail, Yahoo, Thunderbird, Apple Mail)
+    ".mbox": "mbox",
     # Excel spreadsheets
     ".xlsx": "excel",
     ".xls": "excel",

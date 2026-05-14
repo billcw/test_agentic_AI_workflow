@@ -32,6 +32,7 @@ from src.agents.checker import check
 from src.retrieval.multi_turn import multi_turn_retrieve
 from src.agents.critic import critique
 from src.agents.sentiment import analyze_sentiment
+from src.agents.metadata_agent import run_metadata_query
 
 
 # --- State Definition ---
@@ -60,9 +61,33 @@ class AgentState(TypedDict):
     doc_max_chars: int
     needs_clarification: bool
     clarifying_questions: list
+    metadata_result: dict
 
 
 # --- Node Functions ---
+
+def metadata_node(state: AgentState) -> dict:
+    """
+    Handle metadata queries — questions about the email archive itself
+    (counts, dates, senders) answered via SQL, not RAG retrieval.
+
+    Bypasses clarifier, retrieval, all specialist agents, refinement,
+    and critic. Goes directly to END after this node.
+    """
+    print(f"  [Metadata] Running SQL metadata query...")
+    result = run_metadata_query(
+        project_name=state["project_name"],
+        query=state["query"],
+        model=state.get("router_model") or None,
+    )
+    return {
+        "answer":          result["answer"],
+        "sources":         result["sources"],
+        "chunks_used":     result["chunks_used"],
+        "confidence":      result["confidence"],
+        "metadata_result": result,
+    }
+
 
 def router_node(state: AgentState) -> dict:
     """Classify the user intent and scope, store both in state."""
@@ -351,6 +376,17 @@ def critic_node(state: AgentState) -> dict:
     }
 
 
+def route_after_router(state: AgentState) -> str:
+    """
+    Conditional edge after router_node.
+    Metadata queries bypass clarifier and retrieval entirely.
+    All other intents proceed to clarifier as normal.
+    """
+    if state.get("intent") == "metadata":
+        return "metadata"
+    return "clarifier"
+
+
 def route_after_clarifier(state: AgentState) -> str:
     """
     Conditional edge after clarifier_node.
@@ -371,6 +407,7 @@ def route_to_agent(state: AgentState) -> str:
         "check": "check",
         "sentiment": "sentiment",
         "lookup": "lookup",
+        "metadata": "metadata",
     }
     return routes.get(intent, "lookup")
 
@@ -392,11 +429,25 @@ def build_graph():
     graph.add_node("check", check_node)
     graph.add_node("lookup", lookup_node)
     graph.add_node("sentiment", sentiment_node)
+    graph.add_node("metadata", metadata_node)
     graph.add_node("refinement", refinement_node)
     graph.add_node("critic", critic_node)
 
     graph.set_entry_point("router")
-    graph.add_edge("router", "clarifier")
+
+    # After router: metadata queries go directly to metadata node,
+    # all others continue to clarifier as normal
+    graph.add_conditional_edges(
+        "router",
+        route_after_router,
+        {
+            "metadata": "metadata",
+            "clarifier": "clarifier",
+        }
+    )
+
+    # Metadata node exits immediately — no retrieval, refinement, or critic
+    graph.add_edge("metadata", END)
 
     # After clarifier: either exit early with questions, or continue to retrieval
     graph.add_conditional_edges(
@@ -480,7 +531,8 @@ def run_agent(project_name: str, query: str,
         email_max_chars=email_max_chars or 0,
         doc_max_chars=doc_max_chars or 0,
         needs_clarification=False,
-        clarifying_questions=[]
+        clarifying_questions=[],
+        metadata_result={}
     )
 
     final_state = agent_graph.invoke(initial_state)

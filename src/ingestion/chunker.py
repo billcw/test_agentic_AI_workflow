@@ -93,6 +93,10 @@ def chunk_pages(pages: list[dict]) -> list[dict]:
 
         chunks = chunk_text(text)
 
+        # Carry any metadata the reader attached to this page
+        # (e.g. email_date, email_sender, email_subject from pst_reader)
+        page_metadata = page.get("metadata", {})
+
         for i, chunk in enumerate(chunks):
             chunk_id = f"{source}_p{page_num}_c{i}"
             all_chunks.append({
@@ -101,7 +105,8 @@ def chunk_pages(pages: list[dict]) -> list[dict]:
                 "source": source,
                 "page": page_num,
                 "chunk_index": i,
-                "method": method
+                "method": method,
+                "metadata": page_metadata,
             })
 
     return all_chunks

@@ -59,7 +59,13 @@ def _read_eml(file_path: Path) -> list[dict]:
         "page": 1,
         "text": full_text,
         "method": "email",
-        "source": file_path.name
+        "source": file_path.name,
+        "metadata": {
+            "email_date":    date,
+            "email_sender":  sender,
+            "email_subject": subject,
+            "source_type":   "email",
+        },
     }]
 
 
@@ -108,7 +114,13 @@ def _read_msg(file_path: Path) -> list[dict]:
         "page": 1,
         "text": full_text,
         "method": "email",
-        "source": file_path.name
+        "source": file_path.name,
+        "metadata": {
+            "email_date":    date,
+            "email_sender":  sender,
+            "email_subject": subject,
+            "source_type":   "email",
+        },
     }]
 
 

@@ -65,6 +65,9 @@ def initialize_db(project_name: str) -> None:
             method TEXT,
             text_preview TEXT,
             ingested_at TEXT NOT NULL,
+            email_date TEXT,
+            email_sender TEXT,
+            email_subject TEXT,
             FOREIGN KEY (document_id) REFERENCES documents(id)
         )
     """)
@@ -122,10 +125,17 @@ def record_chunks(project_name: str, chunks: list[dict], document_id: int) -> No
     cursor = conn.cursor()
 
     for chunk in chunks:
+        # Pull email metadata if present (None for non-email documents)
+        meta = chunk.get("metadata", {})
+        email_date    = meta.get("email_date")    or meta.get("date")
+        email_sender  = meta.get("email_sender")  or meta.get("sender")
+        email_subject = meta.get("email_subject") or meta.get("subject")
+
         cursor.execute("""
             INSERT OR IGNORE INTO chunks
-            (chunk_id, document_id, source, page, chunk_index, method, text_preview, ingested_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            (chunk_id, document_id, source, page, chunk_index, method,
+             text_preview, ingested_at, email_date, email_sender, email_subject)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             chunk["chunk_id"],
             document_id,
@@ -134,7 +144,10 @@ def record_chunks(project_name: str, chunks: list[dict], document_id: int) -> No
             chunk["chunk_index"],
             chunk["method"],
             chunk["text"][:200],  # Store first 200 chars as preview
-            datetime.now().isoformat()
+            datetime.now().isoformat(),
+            email_date,
+            email_sender,
+            email_subject,
         ))
 
     conn.commit()

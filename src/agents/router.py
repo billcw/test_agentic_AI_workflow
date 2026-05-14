@@ -22,7 +22,8 @@ INTENT_TROUBLESHOOT = "troubleshoot"
 INTENT_CHECK = "check"
 INTENT_LOOKUP = "lookup"
 INTENT_SENTIMENT = "sentiment"
-VALID_INTENTS = {INTENT_TEACH, INTENT_TROUBLESHOOT, INTENT_CHECK, INTENT_LOOKUP, INTENT_SENTIMENT}
+INTENT_METADATA = "metadata"
+VALID_INTENTS = {INTENT_TEACH, INTENT_TROUBLESHOOT, INTENT_CHECK, INTENT_LOOKUP, INTENT_SENTIMENT, INTENT_METADATA}
 
 SCOPE_EMAIL = "email"
 SCOPE_DOCUMENT = "document"
@@ -55,11 +56,21 @@ Classify the user message into exactly one of these five categories:
   Are there any critical or emergency communications?
 
 - lookup: User wants a specific fact, definition, value, or quick
-  reference. Everything else that does not fit the above four.
+  reference. Everything else that does not fit the above five.
   Examples: What is..., What does X mean?, Who is..., When did...
 
+- metadata: User is asking about EMAIL DATABASE STATISTICS or properties
+  that require counting, listing, or sorting emails by date/sender/subject.
+  These are questions about the EMAIL ARCHIVE ITSELF, not about what the
+  emails contain. Examples: How many emails do I have?, What is the oldest
+  email?, Who sent the most emails?, Show me emails from John, What emails
+  came in March 2024?, List senders in my archive.
+  IMPORTANT: If the user asks what emails SAY about a topic (e.g. "What do
+  emails say about the outage?") that is NOT metadata — classify it as the
+  appropriate content intent (troubleshoot, lookup, etc.) instead.
+
 Respond with ONLY the single word category. No explanation. No punctuation.
-Just one of: teach, troubleshoot, check, sentiment, lookup"""
+Just one of: teach, troubleshoot, check, sentiment, lookup, metadata"""
 
 SCOPE_PROMPT = """You are a search scope classifier for a document assistant system.
 The system has two types of documents: emails and technical manuals/documents.

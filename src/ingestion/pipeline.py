@@ -15,6 +15,7 @@ from src.ingestion.excel_reader import read_excel
 from src.ingestion.text_reader import read_text
 from src.ingestion.image_reader import read_image
 from src.ingestion.pst_reader import read_pst
+from src.ingestion.mbox_reader import read_mbox
 from src.ingestion.chunker import chunk_pages
 from src.storage.vector_store import add_chunks
 from src.storage.keyword_store import save_index, load_index
@@ -36,6 +37,7 @@ READERS = {
     "text":  read_text,
     "image": read_image,
     "pst":   read_pst,
+    "mbox":  read_mbox,
 }
 
 
