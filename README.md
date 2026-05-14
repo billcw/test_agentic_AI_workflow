@@ -243,6 +243,7 @@ Your Query
 - [Ollama](https://ollama.ai) installed and running
 - At least 8GB VRAM (12GB recommended for 31B model)
 - Tesseract OCR: `sudo apt install tesseract-ocr`
+- SQLite3 CLI: `sudo apt install sqlite3`
 
 ### 1. Clone the Repository
 
