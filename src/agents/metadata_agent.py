@@ -91,6 +91,37 @@ Do not mention SQL or databases in your answer.
 """
 
 
+def _rewrite_name_likes(sql: str) -> str:
+    """
+    Post-process generated SQL to fix "First Last" name patterns in LIKE clauses.
+
+    Outlook/PST stores names as "Last, First" format. When the LLM generates
+    LIKE '%Joe Deluna%' it never matches. We rewrite it to LIKE '%Deluna%'
+    (last name only) which matches "Deluna, Joe", "Deluna, Joe [Contractor]",
+    and email addresses containing the last name.
+
+    Only rewrites two-word name patterns inside LIKE '...%Name%...' clauses.
+    Single-word patterns are left alone (already correct).
+    """
+    import re
+
+    def replace_name(match):
+        prefix = match.group(1)   # everything before the name
+        name   = match.group(2)   # the name portion e.g. "Joe Deluna"
+        suffix = match.group(3)   # everything after the name
+        words = name.strip().split()
+        if len(words) >= 2:
+            # Use last word only (the surname)
+            last_name = words[-1]
+            print(f"  [Metadata] Name rewrite: '{name}' -> '{last_name}'")
+            return f"{prefix}{last_name}{suffix}"
+        return match.group(0)  # single word, leave alone
+
+    # Match LIKE '%...Name...' patterns — handles quoted names with spaces
+    pattern = r"(LIKE\s+'%?)([A-Za-z][A-Za-z\s\-']{2,30}?)(%')"
+    return re.sub(pattern, replace_name, sql, flags=re.IGNORECASE)
+
+
 def _generate_sql(question: str, model: str = None) -> str:
     """
     Ask the LLM to translate a natural language question into SQL.
@@ -122,6 +153,10 @@ def _generate_sql(question: str, model: str = None) -> str:
         sql = re.sub(r"```sql\s*", "", sql, flags=re.IGNORECASE)
         sql = re.sub(r"```\s*", "", sql)
         sql = sql.strip()
+
+        # Fix "First Last" name patterns → "Last" only
+        # (Outlook stores names as "Last, First" format)
+        sql = _rewrite_name_likes(sql)
 
         return sql
 
