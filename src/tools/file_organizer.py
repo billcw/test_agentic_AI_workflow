@@ -228,6 +228,7 @@ def _classify_file(
     content_preview: Optional[str],
     existing_categories: list[str],
     custom_instructions: Optional[str] = None,
+    model: Optional[str] = None,
 ) -> str:
     """
     Ask gemma4:e4b to assign a category to one file.
@@ -254,7 +255,7 @@ def _classify_file(
       raw string return. Mirrors the approach used in _image_matches_query().
     """
     base_url = OLLAMA.get("base_url", "http://localhost:11434")
-    model = MODELS.get("router_llm", "gemma4:e4b")
+    model = model or MODELS.get("router_llm", "gemma4:e4b")
     timeout = OLLAMA.get("timeout_seconds", 3600)
 
     # Build the existing categories hint
@@ -462,6 +463,7 @@ def _normalize_categories(categories: list[str]) -> dict[str, str]:
 def classify_files(
     folder_path: str,
     custom_instructions: Optional[str] = None,
+    router_model: Optional[str] = None,
 ) -> dict:
     """
     Scan a directory and classify every file using the LLM.
@@ -526,6 +528,7 @@ def classify_files(
                 content_preview=content_preview,
                 existing_categories=existing_categories,
                 custom_instructions=custom_instructions,
+                model=router_model,
             )
 
             if category not in existing_categories:

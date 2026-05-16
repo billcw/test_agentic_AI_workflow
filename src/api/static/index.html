@@ -874,6 +874,10 @@
         <button id="btn-execute-plan">✓ Confirm &amp; Move Files</button>
       </div>
       <div class="tool-row">
+        <span class="imgfilter-label">Router model</span>
+        <select id="org-router-model-select" title="Model used to classify files"></select>
+      </div>
+      <div class="tool-row">
         <button id="org-instructions-toggle">+ Custom instructions</button>
       </div>
       <div id="org-instructions-wrap">
@@ -1187,6 +1191,11 @@ async function loadModels() {
     visionSel.innerHTML = models.map(function(m) { return '<option value="' + m + '">' + m + '</option>'; }).join('');
     setSelectValue(visionSel, loadPref('vision_model', 'gemma4:e4b'));
     visionSel.addEventListener('change', function() { savePref('vision_model', visionSel.value); });
+
+    var orgRouterSel = document.getElementById('org-router-model-select');
+    orgRouterSel.innerHTML = models.map(function(m) { return '<option value="' + m + '">' + m + '</option>'; }).join('');
+    setSelectValue(orgRouterSel, loadPref('org_router_model', 'gemma4:e4b'));
+    orgRouterSel.addEventListener('change', function() { savePref('org_router_model', orgRouterSel.value); });
 
   } catch(e) { console.error('Failed to load models:', e); }
 }
@@ -1640,7 +1649,8 @@ document.getElementById('btn-classify').addEventListener('click', async function
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({
         folder_path: folderPath,
-        custom_instructions: document.getElementById('org-instructions').value.trim()
+        custom_instructions: document.getElementById('org-instructions').value.trim(),
+        router_model: document.getElementById('org-router-model-select').value || null,
       })
     });
     var data = await res.json();
