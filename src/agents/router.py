@@ -56,18 +56,24 @@ Classify the user message into exactly one of these five categories:
   Are there any critical or emergency communications?
 
 - lookup: User wants a specific fact, definition, value, or quick
-  reference. Everything else that does not fit the above five.
-  Examples: What is..., What does X mean?, Who is..., When did...
+  reference, OR wants to find or retrieve emails by sender, topic,
+  date, or subject. Examples: What is..., What does X mean?,
+  Who is..., When did..., Find emails from John, Show me emails
+  about the outage, Get emails from March 2024, Find an email
+  from Joe, What did Joe say about X?
 
-- metadata: User is asking about EMAIL DATABASE STATISTICS or properties
-  that require counting, listing, or sorting emails by date/sender/subject.
-  These are questions about the EMAIL ARCHIVE ITSELF, not about what the
-  emails contain. Examples: How many emails do I have?, What is the oldest
-  email?, Who sent the most emails?, Show me emails from John, What emails
-  came in March 2024?, List senders in my archive.
-  IMPORTANT: If the user asks what emails SAY about a topic (e.g. "What do
-  emails say about the outage?") that is NOT metadata — classify it as the
-  appropriate content intent (troubleshoot, lookup, etc.) instead.
+- metadata: User is asking for PURE EMAIL ARCHIVE STATISTICS that can
+  only be answered by counting, aggregating, or sorting — not by
+  reading email content. These are questions about numbers and facts
+  about the archive itself, not about finding or reading emails.
+  Examples: How many emails do I have?, What is the oldest email?,
+  What is the newest email?, Who sent the most emails?,
+  How many emails did John send?, What is the total email count?
+  IMPORTANT: "Find", "show me", "get", "retrieve", or "read" emails
+  are NEVER metadata — always classify those as lookup instead.
+  IMPORTANT: If the user asks what emails SAY about a topic that is
+  NOT metadata — classify it as the appropriate content intent
+  (troubleshoot, lookup, etc.) instead.
 
 Respond with ONLY the single word category. No explanation. No punctuation.
 Just one of: teach, troubleshoot, check, sentiment, lookup, metadata"""
@@ -134,7 +140,7 @@ def _call_router(prompt: str, valid_values: set, default: str, model: str = None
 def classify_intent(user_message: str, model: str = None) -> str:
     """
     Classify the intent of a user message using the E4B router model.
-    Returns one of: teach, troubleshoot, check, sentiment, lookup
+    Returns one of: teach, troubleshoot, check, sentiment, lookup, metadata
     Falls back to lookup if the model returns something unexpected.
     """
     prompt = INTENT_PROMPT + "\n\nUser message: " + user_message
