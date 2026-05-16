@@ -1,44 +1,58 @@
 """
-pipeline.py - Full document ingestion orchestrator.
-Ties together: detector -> reader -> chunker -> vector store -> BM25 -> metadata DB.
-
-This is the single entry point for ingesting documents.
-Call ingest_file() for one file, or ingest_directory() for a whole folder.
+pipeline.py - Document ingestion pipeline.
+Orchestrates the full flow: detect -> read -> chunk -> index -> record.
 """
 
 from pathlib import Path
-from src.ingestion.detector import detect_file_type, scan_directory
+from src.ingestion.detector import detect_file_type
 from src.ingestion.pdf_reader import read_pdf
+from src.ingestion.image_reader import read_image
 from src.ingestion.docx_reader import read_docx
 from src.ingestion.email_reader import read_email
 from src.ingestion.excel_reader import read_excel
 from src.ingestion.text_reader import read_text
-from src.ingestion.image_reader import read_image
 from src.ingestion.pst_reader import read_pst
 from src.ingestion.mbox_reader import read_mbox
 from src.ingestion.chunker import chunk_pages
-from src.storage.vector_store import add_chunks
-from src.storage.keyword_store import save_index, load_index
+from src.storage.vector_store import add_chunks, get_or_create_collection
+from src.storage.keyword_store import load_index, save_index
 from src.storage.metadata_db import (
     initialize_db,
     document_already_ingested,
+    purge_document,
     record_document,
     record_chunks,
-    get_project_stats
 )
 
-
-# Map file types to their reader functions
 READERS = {
-    "pdf":   read_pdf,
-    "docx":  read_docx,
-    "email": read_email,
-    "excel": read_excel,
-    "text":  read_text,
-    "image": read_image,
-    "pst":   read_pst,
-    "mbox":  read_mbox,
+    "pdf":      read_pdf,
+    "image":    read_image,
+    "docx":     read_docx,
+    "email":    read_email,
+    "excel":    read_excel,
+    "text":     read_text,
+    "pst":      read_pst,
+    "mbox":     read_mbox,
 }
+
+CHROMA_BATCH = 500
+
+
+def _purge_from_chroma(project_name: str, chunk_ids: list[str]) -> None:
+    """
+    Delete a list of chunk_ids from ChromaDB in batches.
+
+    Called by ingest_file() when force=True, after purge_document()
+    has cleaned SQLite. Together they ensure a complete clean slate
+    before re-ingestion so no stale data (e.g. empty email metadata)
+    survives from a prior ingest run.
+    """
+    if not chunk_ids:
+        return
+    collection = get_or_create_collection(project_name)
+    for i in range(0, len(chunk_ids), CHROMA_BATCH):
+        batch = chunk_ids[i:i + CHROMA_BATCH]
+        collection.delete(ids=batch)
 
 
 def ingest_file(project_name: str, file_path: str | Path,
@@ -49,7 +63,12 @@ def ingest_file(project_name: str, file_path: str | Path,
     Args:
         project_name: The project workspace to ingest into
         file_path: Path to the document
-        force: If True, re-ingest even if already indexed
+        force: If True, purge existing chunks and re-ingest from scratch.
+               This guarantees stale metadata (e.g. empty email fields
+               from a pre-metadata-column ingest) is replaced with fresh
+               data. Without purging first, INSERT OR IGNORE in SQLite
+               and the skip-if-exists check in ChromaDB would silently
+               retain the old empty records.
 
     Returns a result dict:
     {
@@ -83,11 +102,23 @@ def ingest_file(project_name: str, file_path: str | Path,
             "message": "Already ingested - use force=True to re-ingest"
         }
 
+    # Step 3b: If forced, purge existing records so re-ingest is clean.
+    # purge_document() removes chunk rows and the document row from SQLite
+    # and returns the old chunk_ids so we can also clean ChromaDB.
+    # Without this, INSERT OR IGNORE (SQLite) and the exists-check
+    # (ChromaDB add_chunks) silently skip already-present chunk_ids,
+    # leaving stale data in place even after a force re-ingest.
+    if force:
+        old_chunk_ids = purge_document(project_name, str(file_path))
+        if old_chunk_ids:
+            print(f"  [Pipeline] Purged {len(old_chunk_ids)} stale chunks "
+                  f"for {file_path.name}")
+        _purge_from_chroma(project_name, old_chunk_ids)
+
     try:
         # Step 4: Read the document
         reader = READERS[file_type]
         pages = reader(file_path)
-
         if not pages:
             return {
                 "status": "error",
@@ -98,7 +129,6 @@ def ingest_file(project_name: str, file_path: str | Path,
 
         # Step 5: Chunk the pages
         chunks = chunk_pages(pages)
-
         if not chunks:
             return {
                 "status": "error",
@@ -149,65 +179,46 @@ def ingest_file(project_name: str, file_path: str | Path,
 def ingest_directory(project_name: str, directory: str | Path,
                      force: bool = False) -> dict:
     """
-    Ingest all supported documents from a directory recursively.
+    Ingest all supported documents in a directory (recursively).
+
+    Args:
+        project_name: The project workspace to ingest into
+        directory: Path to the directory to scan
+        force: If True, re-ingest files even if already indexed
 
     Returns a summary dict:
     {
-        "ingested": 10,
+        "ingested": 5,
         "skipped": 2,
         "errors": 1,
-        "total": 13,
+        "total": 8,
         "results": [...]
     }
     """
     directory = Path(directory)
-    print(f"\nScanning {directory} for documents...")
+    if not directory.exists():
+        return {
+            "ingested": 0,
+            "skipped": 0,
+            "errors": 1,
+            "total": 0,
+            "results": [{"status": "error", "message": f"Directory not found: {directory}"}]
+        }
 
-    # Scan directory for all files
-    file_groups = scan_directory(directory)
-
-    # Collect all supported files
-    all_files = []
-    for file_type, files in file_groups.items():
-        if file_type != "unsupported":
-            all_files.extend(files)
-
-    unsupported = file_groups.get("unsupported", [])
-
-    print(f"Found {len(all_files)} supported files, "
-          f"{len(unsupported)} unsupported files")
-
-    # Ingest each file
     results = []
-    ingested = skipped = errors = 0
+    for file_path in sorted(directory.rglob("*")):
+        if file_path.is_file():
+            result = ingest_file(project_name, file_path, force=force)
+            results.append(result)
 
-    for i, file_path in enumerate(all_files):
-        print(f"  [{i+1}/{len(all_files)}] {file_path.name}...", end=" ")
-        result = ingest_file(project_name, file_path, force=force)
-        results.append(result)
-
-        if result["status"] == "ingested":
-            ingested += 1
-            print(f"OK ({result['chunks']} chunks)")
-        elif result["status"] == "skipped":
-            skipped += 1
-            print("SKIPPED")
-        else:
-            errors += 1
-            print(f"ERROR: {result['message']}")
-
-    # Print final stats
-    stats = get_project_stats(project_name)
-    print(f"\nIngestion complete:")
-    print(f"  Ingested: {ingested}")
-    print(f"  Skipped:  {skipped}")
-    print(f"  Errors:   {errors}")
-    print(f"  Project total: {stats['documents']} docs, {stats['chunks']} chunks")
+    ingested = sum(1 for r in results if r["status"] == "ingested")
+    skipped  = sum(1 for r in results if r["status"] == "skipped")
+    errors   = sum(1 for r in results if r["status"] == "error")
 
     return {
         "ingested": ingested,
-        "skipped": skipped,
-        "errors": errors,
-        "total": len(all_files),
-        "results": results
+        "skipped":  skipped,
+        "errors":   errors,
+        "total":    len(results),
+        "results":  results
     }

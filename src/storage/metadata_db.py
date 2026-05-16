@@ -89,6 +89,52 @@ def document_already_ingested(project_name: str, file_path: str) -> bool:
     return result is not None
 
 
+def purge_document(project_name: str, file_path: str) -> list[str]:
+    """
+    Delete a document and all its chunks from SQLite.
+
+    Called by ingest_file() when force=True, before re-ingesting.
+    Clearing the old records first ensures that INSERT OR IGNORE in
+    record_chunks() and the skip-if-exists check in add_chunks() do
+    not silently retain stale data (e.g. empty email metadata fields
+    from a prior ingestion that predates the email metadata columns).
+
+    Returns the list of chunk_ids that were deleted so the caller
+    can also remove them from ChromaDB.
+    Returns an empty list if the document was not found (safe to call
+    on documents that were never ingested).
+    """
+    conn = get_connection(project_name)
+    cursor = conn.cursor()
+
+    # Look up document by file_path
+    cursor.execute(
+        "SELECT id FROM documents WHERE file_path = ?",
+        (str(file_path),)
+    )
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        return []
+
+    doc_id = row["id"]
+
+    # Collect chunk_ids before deleting so ChromaDB can be cleaned too
+    cursor.execute(
+        "SELECT chunk_id FROM chunks WHERE document_id = ?",
+        (doc_id,)
+    )
+    chunk_ids = [r["chunk_id"] for r in cursor.fetchall()]
+
+    # Delete chunks first (foreign key child), then document (parent)
+    cursor.execute("DELETE FROM chunks WHERE document_id = ?", (doc_id,))
+    cursor.execute("DELETE FROM documents WHERE id = ?", (doc_id,))
+    conn.commit()
+    conn.close()
+
+    return chunk_ids
+
+
 def record_document(project_name: str, file_path: str, file_type: str,
                     page_count: int, chunk_count: int) -> int:
     """

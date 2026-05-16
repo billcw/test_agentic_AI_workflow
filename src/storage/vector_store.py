@@ -53,6 +53,13 @@ def add_chunks(project_name: str, chunks: list[dict]) -> int:
     Add a list of chunks to the vector store.
     Generates embeddings for each chunk and stores them in batches
     to avoid exceeding ChromaDB's maximum batch size limit.
+
+    Email metadata (email_date, email_sender, email_subject) is stored
+    for email chunks so ChromaDB where filters can narrow searches by
+    date range. Non-email chunks receive empty strings for these fields
+    because ChromaDB requires identical metadata keys across all
+    documents in a collection.
+
     Returns the number of chunks added.
     """
     if not chunks:
@@ -81,11 +88,20 @@ def add_chunks(project_name: str, chunks: list[dict]) -> int:
         ids.append(chunk_id)
         embeddings.append(embedding)
         documents.append(chunk["text"])
+
+        # Store email metadata fields for all chunks.
+        # Email chunks carry real values; non-email chunks get empty
+        # strings. ChromaDB requires every document in a collection to
+        # have the same metadata keys — mixing present/absent keys
+        # causes query errors when where filters reference those keys.
         metadatas.append({
-            "source": chunk["source"],
-            "page": chunk["page"],
-            "chunk_index": chunk["chunk_index"],
-            "method": chunk["method"]
+            "source":        chunk["source"],
+            "page":          chunk["page"],
+            "chunk_index":   chunk["chunk_index"],
+            "method":        chunk["method"],
+            "email_date":    chunk.get("email_date")    or "",
+            "email_sender":  chunk.get("email_sender")  or "",
+            "email_subject": chunk.get("email_subject") or "",
         })
 
         # Flush to ChromaDB whenever we hit the batch size limit.
